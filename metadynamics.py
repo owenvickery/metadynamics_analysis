@@ -374,125 +374,140 @@ def set_to_zero(energy):
 		# print(energy[-20:-1])
 	return energy
 
-def	parameters(protein):
+def	parameters():
+	param={}
+	if os.path.exists(args.input):
+		with open(args.input, 'r') as param_input:
+			for line_nr, line in enumerate(param_input.readlines()):
+	            line_sep=line.split('=') 
+	            variable = line_sep[0].strip()
+	            if variable in ['x_points', 'y_points', 'ring_location', 'area', 'picture_loc']:
+	            	param[variable]=list(line_sep[-1].strip())
+	            elif variable in ['fes', 'picture']:
+	            	param[variable]=str(line_sep[-1].strip())
+	            elif variable in ['invert','minz','step','lim_ux','lim_ly','label_loc_x','label_loc_y']:
+	            	param[variable]=float(line_sep[-1].strip())
+	            else:
+	            	pass
+	else:
+		sys.exit('cannot find parameter file: '+args.input)
+	return param
+	# if protein=='leut':
+	# 	search_width=0.5
+	# 	fes='fes_averaged-171-742'
+	# 	invert=1
+	# 	x_points, y_points=[[-0.155,-0.1551],[2.9,4.39],[-0.155,-0.1551],[-2.45,-3.5]],[[0.7,5.5],[1.87,4.35],[-0.7,-5.5],[-1.6,-5]] 
+	# 	# x_points, y_points=[[-0.155,-0.1551],[-0.155,-0.1551]],[[0.7,5.5],[-0.7,-5.5]] 
 
-	
-	if protein=='leut':
-		search_width=0.5
-		fes='fes_averaged-171-742'
-		invert=1
-		x_points, y_points=[[-0.155,-0.1551],[2.9,4.39],[-0.155,-0.1551],[-2.45,-3.5]],[[0.7,5.5],[1.87,4.35],[-0.7,-5.5],[-1.6,-5]] 
-		# x_points, y_points=[[-0.155,-0.1551],[-0.155,-0.1551]],[[0.7,5.5],[-0.7,-5.5]] 
+	# 	minz=-15
+	# 	ring_location=[[-0.2,1.6], [3.35,2.59],[-0.06,-1.83],[-2.68,-2.62]] 
+	# 	# ring_location=[[-0.2,1.6], [-0.06,-1.83]] 
 
-		minz=-15
-		ring_location=[[-0.2,1.6], [3.35,2.59],[-0.06,-1.83],[-2.68,-2.62]] 
-		# ring_location=[[-0.2,1.6], [-0.06,-1.83]] 
-
-		area=[0.5,0.5,0.5,0.5] 
-		step =2.5
-		picture='/sansom/s136/bioc1534/Documents/MD/leut/leut.tga'
-		picture_loc=[-5.33, 5.33, -3,3.15]
-		lim_ux, lim_ly=190, -50
-		label_loc_x, label_loc_y=188,15
-	if protein=='aac':
-		search_width=0.5
-		fes='fes_averaged-126-448'
-		fes='fes_bootstrapped-126-448'
-		# fes='fes_bootstrapped-126-130'
-		fes='fes_11.dat'
-		invert=1
-		x_points, y_points=[[-0.83,-3.28],[-0.12,-1.15], [1.29,4.08]],[[0.83,2.688],[-1.18,-4.12],[0.15,0.97]]  # AAC
-		minz=-15
-		ring_location=[[1.21,1.14],[0.35,-1.64],[-1.77,0.32]] # ant
-		area=[0.5,0.5,0.5]
-		step =2.5
-		picture='/sansom/s136/bioc1534/Documents/MD/AAC/build/picture.tga'
-		picture_loc=[2.9, -2.9, 2.9, -2.9]
-		lim_ux, lim_ly=115, -30
-		label_loc_x, label_loc_y=113,15
-	if protein=='kir':
-		search_width=1
-		fes='fes_averaged-326-426'
-		fes='fes_bootstrapped-326-664'
-		# fes='fes_327.dat'
-		invert=1
-		x_points, y_points=[[0.,0.0001],[1,4.4],[0,0.0001],[-1,-4.4]],[[1,4.4],[0,0.0001],[-1,-4.4],[0,0.0001]] #kir
-		minz=-60
-		ring_location=[[-0.3,1.83], [1.807,0.399],[2.178,-0.107],[-0.25,-2.2],[-2.13,-0.097]] # kir
-		area=[0.5,0.3,0.3,0.5,0.5] #kir
-		step =2.5
-		picture='/sansom/s136/bioc1534/Documents/MD/kir2.2/KIR2_hills/picture.tga'
-		picture_loc=[-3, 3, 3, -3]
-		lim_ux, lim_ly=170, -80
-		label_loc_x, label_loc_y=168,10 
-	if protein=='a2a':
-		search_width=0.5
-		fes='fes_averaged-60-491'
-		# fes='fes_bootstrapped-60-492'
-		fes='fes_59.dat'
-		invert=1
-		x_points, y_points=[[-0.4,-2.74],[-0.12,2.11],[0.68,2.91]],[[-1.46,-2.52],[-1.17,-3.03],[-0.05,-1.91]]
-		minz=-15
-		ring_location=[[0.91976558,-1.75777755],[-0.29351581,-1.50070987],[-1.26542814,-0.49920235]]# A2a
-		area=[0.5,0.5,0.5]
-		step =2.5
-		picture='/sansom/s136/bioc1534/Documents/MD/A2a/metadynamics/extracellular/A2A_hills/picture.tga'
-		picture_loc=[2.7,-3.2, 3.1,-3.1]
-		lim_ux, lim_ly=125, -30
-		label_loc_x, label_loc_y=123,15
-	if protein=='lgt':
-		search_width=3
-		fes='fes.dat'
-		invert=1
-		x_points, y_points=[[-1.80,1.288]],[[-1.60,-2.52]]
-		minz=-70
-		ring_location=[[-1.80,2.74]]# lgt largest
-		area=[0.5,0.5,0.5]
-		step =2.5
-		picture=False
-		picture_loc=[2.7,-3.2, 3.1,-3.1]
-		lim_ux, lim_ly=75, -30
-		label_loc_x, label_loc_y=72,15
-	if protein=='lsp':
-		search_width=180
-		fes='fes.dat'
-		invert=1
-		x_points, y_points=[[-1,5.5]],[[0,0]]
-		minz=-80
-		ring_location=[[-1.80,2.74]]# lgt largest
-		area=[0.5,0.5,0.5]
-		step =2.5
-		picture=False
-		picture_loc=[2.7,-3.2, 3.1,-3.1]
-		lim_ux, lim_ly=85, -30
-		label_loc_x, label_loc_y=72,15
-	if protein=='dor':
-		search_width=0.1
-		fes='fes.dat'
-		invert=1
-		x_points, y_points=[[-1.80,1.288]],[[-1.60,-2.52]]
-		minz=-80
-		ring_location=[[-1.80,2.74]]# lgt largest
-		area=[0.5,0.5,0.5]
-		step =2.5
-		picture='/sansom/s136/bioc1534/Documents/MD/A2a/metadynamics/extracellular/A2A_hills/picture.tga'
-		picture_loc=[2.7,-3.2, 3.1,-3.1]
-		lim_ux, lim_ly=85, -30
-		label_loc_x, label_loc_y=72,15
-	if protein=='lpt':
-		search_width=2
-		fes='fes.dat'
-		invert=1
-		x_points, y_points=[[0,0]],[[-7,7]]
-		minz=-80
-		ring_location=[[-1.80,2.74]]# lgt largest
-		area=[0.5,0.5,0.5]
-		step =2.5
-		picture=False
-		picture_loc=[2.7,-3.2, 3.1,-3.1]
-		lim_ux, lim_ly=85, -30
-		label_loc_x, label_loc_y=72,15
-	return search_width, fes, invert,x_points, y_points,minz,ring_location,area, step, picture, picture_loc, lim_ux, lim_ly, label_loc_x, label_loc_y
+	# 	area=[0.5,0.5,0.5,0.5] 
+	# 	step =2.5
+	# 	picture='/sansom/s136/bioc1534/Documents/MD/leut/leut.tga'
+	# 	picture_loc=[-5.33, 5.33, -3,3.15]
+	# 	lim_ux, lim_ly=190, -50
+	# 	label_loc_x, label_loc_y=188,15
+	# if protein=='aac':
+	# 	search_width=0.5
+	# 	fes='fes_averaged-126-448'
+	# 	fes='fes_bootstrapped-126-448'
+	# 	# fes='fes_bootstrapped-126-130'
+	# 	fes='fes_11.dat'
+	# 	invert=1
+	# 	x_points, y_points=[[-0.83,-3.28],[-0.12,-1.15], [1.29,4.08]],[[0.83,2.688],[-1.18,-4.12],[0.15,0.97]]  # AAC
+	# 	minz=-15
+	# 	ring_location=[[1.21,1.14],[0.35,-1.64],[-1.77,0.32]] # ant
+	# 	area=[0.5,0.5,0.5]
+	# 	step =2.5
+	# 	picture='/sansom/s136/bioc1534/Documents/MD/AAC/build/picture.tga'
+	# 	picture_loc=[2.9, -2.9, 2.9, -2.9]
+	# 	lim_ux, lim_ly=115, -30
+	# 	label_loc_x, label_loc_y=113,15
+	# if protein=='kir':
+	# 	search_width=1
+	# 	fes='fes_averaged-326-426'
+	# 	fes='fes_bootstrapped-326-664'
+	# 	# fes='fes_327.dat'
+	# 	invert=1
+	# 	x_points, y_points=[[0.,0.0001],[1,4.4],[0,0.0001],[-1,-4.4]],[[1,4.4],[0,0.0001],[-1,-4.4],[0,0.0001]] #kir
+	# 	minz=-60
+	# 	ring_location=[[-0.3,1.83], [1.807,0.399],[2.178,-0.107],[-0.25,-2.2],[-2.13,-0.097]] # kir
+	# 	area=[0.5,0.3,0.3,0.5,0.5] #kir
+	# 	step =2.5
+	# 	picture='/sansom/s136/bioc1534/Documents/MD/kir2.2/KIR2_hills/picture.tga'
+	# 	picture_loc=[-3, 3, 3, -3]
+	# 	lim_ux, lim_ly=170, -80
+	# 	label_loc_x, label_loc_y=168,10 
+	# if protein=='a2a':
+	# 	search_width=0.5
+	# 	fes='fes_averaged-60-491'
+	# 	# fes='fes_bootstrapped-60-492'
+	# 	fes='fes_59.dat'
+	# 	invert=1
+	# 	x_points, y_points=[[-0.4,-2.74],[-0.12,2.11],[0.68,2.91]],[[-1.46,-2.52],[-1.17,-3.03],[-0.05,-1.91]]
+	# 	minz=-15
+	# 	ring_location=[[0.91976558,-1.75777755],[-0.29351581,-1.50070987],[-1.26542814,-0.49920235]]# A2a
+	# 	area=[0.5,0.5,0.5]
+	# 	step =2.5
+	# 	picture='/sansom/s136/bioc1534/Documents/MD/A2a/metadynamics/extracellular/A2A_hills/picture.tga'
+	# 	picture_loc=[2.7,-3.2, 3.1,-3.1]
+	# 	lim_ux, lim_ly=125, -30
+	# 	label_loc_x, label_loc_y=123,15
+	# if protein=='lgt':
+	# 	search_width=3
+	# 	fes='fes.dat'
+	# 	invert=1
+	# 	x_points, y_points=[[-1.80,1.288]],[[-1.60,-2.52]]
+	# 	minz=-70
+	# 	ring_location=[[-1.80,2.74]]# lgt largest
+	# 	area=[0.5,0.5,0.5]
+	# 	step =2.5
+	# 	picture=False
+	# 	picture_loc=[2.7,-3.2, 3.1,-3.1]
+	# 	lim_ux, lim_ly=75, -30
+	# 	label_loc_x, label_loc_y=72,15
+	# if protein=='lsp':
+	# 	search_width=180
+	# 	fes='fes.dat'
+	# 	invert=1
+	# 	x_points, y_points=[[-1,5.5]],[[0,0]]
+	# 	minz=-80
+	# 	ring_location=[[-1.80,2.74]]# lgt largest
+	# 	area=[0.5,0.5,0.5]
+	# 	step =2.5
+	# 	picture=False
+	# 	picture_loc=[2.7,-3.2, 3.1,-3.1]
+	# 	lim_ux, lim_ly=85, -30
+	# 	label_loc_x, label_loc_y=72,15
+	# if protein=='dor':
+	# 	search_width=0.1
+	# 	fes='fes.dat'
+	# 	invert=1
+	# 	x_points, y_points=[[-1.80,1.288]],[[-1.60,-2.52]]
+	# 	minz=-80
+	# 	ring_location=[[-1.80,2.74]]# lgt largest
+	# 	area=[0.5,0.5,0.5]
+	# 	step =2.5
+	# 	picture='/sansom/s136/bioc1534/Documents/MD/A2a/metadynamics/extracellular/A2A_hills/picture.tga'
+	# 	picture_loc=[2.7,-3.2, 3.1,-3.1]
+	# 	lim_ux, lim_ly=85, -30
+	# 	label_loc_x, label_loc_y=72,15
+	# if protein=='lpt':
+	# 	search_width=2
+	# 	fes='fes.dat'
+	# 	invert=1
+	# 	x_points, y_points=[[0,0]],[[-7,7]]
+	# 	minz=-80
+	# 	ring_location=[[-1.80,2.74]]# lgt largest
+	# 	area=[0.5,0.5,0.5]
+	# 	step =2.5
+	# 	picture=False
+	# 	picture_loc=[2.7,-3.2, 3.1,-3.1]
+	# 	lim_ux, lim_ly=85, -30
+	# 	label_loc_x, label_loc_y=72,15
+	# return search_width, fes, invert,x_points, y_points,minz,ring_location,area, step, picture, picture_loc, lim_ux, lim_ly, label_loc_x, label_loc_y
 
 def find_min(floatz):
 	minz=np.round(floatz,-1)
