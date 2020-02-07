@@ -270,17 +270,19 @@ def hills_converge():
     labels=25   #energy label
     title_height=0.75 #0.75
     labels_size=35
+
     lab=[]
     time, dx, dy,gau = readhills('HILLS_skipped')
     time_bulk ,bulk = read_bulk('bulk_values',time, dx, dy,gau)
-
-    # sites = np.genfromtxt('energies')
-    # time_energy=np.arange(0,len(sites[:,0]), 1)*0.25
-    # print(len(time_energy), len(sites[:,3]))
+    lim_ux=max(time)+2
+    if os.path.exists('energies_time'):
+        sites = np.genfromtxt('energies_time')
+        time_energy=np.arange(0,len(sites[:,0]), 1)*0.25
+        print(len(time_energy), len(sites[:,3]))
     start = np.argmax(ave(bulk, 10)<np.max(gau)*0.05)
     plt.figure(1, figsize=(20,30))
 
-    plt.subplot(2+len(ring_location),1,1)
+    plt.subplot(2+len(param['ring_location']),1,1)
     plt.title('Raw gaussian height' ,  fontproperties=font1, fontsize=40,y=1.05)
     # plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
     plt.plot(time,gau, color='blue',linewidth=4)
@@ -291,7 +293,7 @@ def hills_converge():
     plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
     plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size)
 
-    plt.subplot(2+len(ring_location),1,2)
+    plt.subplot(2+len(param['ring_location']),1,2)
     plt.title('Bulk gaussian height' ,  fontproperties=font1, fontsize=40,y=title_height)
     plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
     plt.plot(time_bulk ,bulk, color='blue',linewidth=4)
@@ -302,36 +304,34 @@ def hills_converge():
     plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
     plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size) 
     # plt.xlabel('Time ($\mu$s)', fontproperties=font2,fontsize=30)
-    rin=2
-    # for val, fig_num in enumerate(range(3,2+len(ring_location)*2,2)): 
-    #   center=np.where(np.sqrt((((ring_location[rin-2][0]*invert)-dx)**2)+((ring_location[rin-2][1]-dy)**2)) < area[val])
-    #   for time_interval in range(0, 130, 10):
-    #       try:
-    #           average_ind=np.where(np.logical_and(time_energy>ave(time_bulk, 10)[start],time_energy<ave(time_bulk, 10)[start]+time_interval))
-    #       except:
-    #           average_ind=np.where(time_energy>ave(time_bulk, 10)[start])
-    #           break
-        # plt.subplot(2+len(ring_location),1,val+3)
-        # plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
-        # if args.p == 'kir':
-        #   if rin-1==2:
-        #       plt.title('Site '+str(rin-1)+'i' ,  fontproperties=font1, fontsize=40,y=title_height)#+' gaussian height'
-        #   if rin-1==3:
-        #       plt.title('Site '+str(rin-2)+'ii' ,  fontproperties=font1, fontsize=40,y=title_height)#+' gaussian height'      
-        #   if rin-1>3:
-        #       plt.title('Site '+str(rin-2) ,  fontproperties=font1, fontsize=40,y=title_height)#+' gaussian height'
-        #   if rin-1==1:
-        #       plt.title('Site '+str(rin-1) ,  fontproperties=font1, fontsize=40,y=title_height)#+' gaussian height'
-        # else:
-        #   plt.title('Site '+str(rin-1) ,  fontproperties=font1, fontsize=40,y=title_height)#+' gaussian height'
+    for val, fig_num in enumerate(range(3,2+len(param['ring_location'])*2,2)): 
+        if param['circle_plot']:
+            center=np.where(np.sqrt(((param['ring_location'][val][0]-dx)**2)+((param['ring_location'][val][1]-dy)**2)) <= param['circle_area'][val])
+        elif param['ellipse_plot']:
+            center=ellipse_check_point(dx, dy, param['ring_location'][val], param['ellipse_width'][val], param['ellipse_height'][val], param['ellipse_angle'][val])
 
-        # plt.scatter(time[center],gau[center], s=100, color='blue')
-        # plt.scatter(ave(time[center], 10), ave(gau[center], 10), s=25, alpha=0.3, color='red')
-        # plt.yticks(np.arange(0, 1.21,0.4), fontproperties=font1,  fontsize=35)
-        # plt.xticks(np.arange(0, 200,10), fontproperties=font1,  fontsize=35)#
-        # plt.ylim(-0.1,1.2);plt.xlim(-2, lim_ux)
-        # # plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
-        # plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size) 
+
+
+
+
+        # for time_interval in range(0, 130, 10):
+        #     try:
+        #         average_ind=np.where(np.logical_and(time_energy>ave(time_bulk, 10)[start],time_energy<ave(time_bulk, 10)[start]+time_interval))
+        #     except:
+        #         average_ind=np.where(time_energy>ave(time_bulk, 10)[start])
+        #         break
+        plt.subplot(2+len(param['ring_location']),1,val+3)
+        plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
+
+        plt.title('Site '+str(val) ,  fontproperties=font1, fontsize=40,y=title_height)#+' gaussian height'
+
+        plt.scatter(time[center],gau[center], s=100, color='blue')
+        plt.scatter(ave(time[center], 10), ave(gau[center], 10), s=25, alpha=0.3, color='red')
+        plt.yticks(np.arange(0, 1.21,0.4), fontproperties=font1,  fontsize=35)
+        plt.xticks(np.arange(0, 200,10), fontproperties=font1,  fontsize=35)#
+        plt.ylim(-0.1,1.2);plt.xlim(-2, lim_ux)
+        # plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
+        plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size) 
 
 
         # plt.subplot(2+len(ring_location)*2,1,fig_num+1)
@@ -372,25 +372,26 @@ def set_to_zero(energy):
     return energy
 
 def parameters():
-    param={}
+    param={'circle_plot':False,'ellipse_plot':False, 'picture':False, '1d':False, 'bulk_outline':False, 'prefix':'fes_', '1d_location':'1d_landscapes'}
     if os.path.exists(args.input):
         with open(args.input, 'r') as param_input:
             for line_nr, line in enumerate(param_input.readlines()):
                 if not line.startswith('#'):
-                    line_sep=line.split('=') 
+                    line_sep=line.split('#')[0].split('=') #.split('#')[0] 
                     variable = line_sep[0].strip()
-                    if variable in ['area', 'picture_loc', 'min_cv', 'cutoff']:
+                    if variable in ['area', 'picture_loc', 'min_cv', 'cutoff', 'circle_area', 'ellipse_height', 'ellipse_width', 'ellipse_angle', 'cutoff', 
+                                    'min_cv', 'walker_range']:
                         l = np.array([float(x) for x in line_sep[-1].strip().split(',')])
                         param[variable]=l
                     elif variable in ['x_points', 'y_points', 'ring_location']:
                         l = np.array([float(i) for x in line_sep[-1].strip().split() for i in x.split(',')])
                         lr = l.reshape(int(len(l)/2), 2)
                         param[variable]=lr
-                    elif variable in ['fes', 'picture_file', 'bulk_values', 'CV1', 'CV2']:
+                    elif variable in ['fes', 'picture_file', 'bulk_values', 'CV1', 'CV2', 'prefix', '1d_location']:
                         param[variable]=str(line_sep[-1].strip())
 
-                    elif variable in ['invert','minz','step','lim_ux','lim_ly','label_loc_x','label_loc_y',
-                                      'interval_x', 'interval_y','energy_max', 'colour_bar_tick', 'search_width','cut', 'equilibration']:
+                    elif variable in ['invert','minz','step','lim_ux','lim_ly','label_loc_x','label_loc_y','title_height','lab_y', 'labels_size', 'step_yaxis',
+                                      'interval_x', 'interval_y','energy_max', 'colour_bar_tick', 'search_width','cut', 'equilibration', 'stride']:
                         param[variable]=float(line_sep[-1].strip())
 
                     elif variable in ['circle_plot','ellipse_plot', 'picture', '1d', 'bulk_outline']:
@@ -464,7 +465,7 @@ def final_frame():
         con = ax1.contour(X*param['invert'],Y,Z,np.append(np.arange(minz, 0, param['step']*2),10), linewidths=8, cmap=plt.get_cmap('coolwarm_r'), linestyles='-',norm=MidpointNormalize(midpoint=0.), alpha=1, vmin = minz, vmax = maxz )#, alpha=1)#colors='k'# cax = ax1.contourf(X,Y,Z,np.arange(-100, 15, 5), cmap=cm.coolwarm, vmin = minz, vmax = 15 , alpha=1)
 
     ### colourbar   np.arange(np.round(minz,-1), maxz+1, step*2))
-        cbar = fig1.colorbar(cax, ticks=np.append(np.arange(np.round(minz,0), 0.1, param['step']*4),param['colour_bar_tick']))#.set_alpha(1)
+        cbar = fig1.colorbar(cax, ticks=np.append(np.arange(np.round(minz,0), 0.1, param['colour_bar_tick']*4),param['colour_bar_tick']))#.set_alpha(1)
         ticklabs = cbar.ax.get_yticklabels()
         cbar.ax.set_yticklabels(ticklabs, ha='right', va='center', fontsize=60)
         cbar.set_label('Free energy (kJ mol$^{-1}$)',fontsize=60, labelpad=40)
@@ -477,33 +478,13 @@ def final_frame():
         if param['circle_plot']:
             # circle = plt.Circle((0,0, area[val],linewidth=10,edgecolor='k',facecolor='none', zorder=2)
             for val, ring in enumerate(param['ring_location']):
-                circle = plt.Circle((ring[0],ring[1]), param['area'][val],linewidth=10,edgecolor='k',facecolor='none', zorder=2)
+                circle = plt.Circle((ring[0],ring[1]), param['circle_area'][val],linewidth=10,edgecolor='k',facecolor='none', zorder=2)
                 ax1.add_artist(circle)
         if param['ellipse_plot']:
             for val, ring in enumerate(param['ring_location']):
             # ellipse = Ellipse(xy=(-1.69,75), width=0.4, height=60, angle=0.25,linewidth=10,edgecolor='k',facecolor='none', zorder=2) # original
-                ellipse = Ellipse(xy=(ring[0],ring[1]), width=param['ellipse_width'], height=param['ellipse_height'], angle=param['ellipse_angle'],linewidth=10,edgecolor='k',facecolor='none', zorder=2) # original
+                ellipse = patches.Ellipse(xy=(ring[0],ring[1]), width=param['ellipse_width'], height=param['ellipse_height'], angle=param['ellipse_angle'],linewidth=10,edgecolor='k',facecolor='none', zorder=2) # original
                 ax1.add_artist(ellipse)
-
-            # ell_x, ell_y=[],[]
-            # xe,ye,w, h, a=-1.69,75,0.4,60,0.25#np.degrees(0.25) 
-            # # for coord in shuffledxy:
-            # cos_angle = np.cos(np.radians(180.-a))
-            # sin_angle = np.sin(np.radians(180.-a))
-
-            # xc = x - xe
-            # yc = y - ye
-
-            # xct = xc * cos_angle - yc * sin_angle
-            # yct = xc * sin_angle + yc * cos_angle 
-
-            # rad_cc = (xct**2/(w/2.)**2) + (yct**2/(h/2.)**2)
-
-            # for val,r in enumerate(rad_cc):
-            #   if r <= 1.:
-            #         # point in ellipse
-            #       ell_x.append(x[val])
-            #       ell_y.append(y[val])
 
     ### Tick parameters
         
@@ -558,7 +539,7 @@ def final_frame():
     else:
 #### Error analysis plot
 
-        fig1 = plt.figure(1, figsize=(35,20))### error plot   [0,2.5,5,7.5,10,12.5,15]
+        fig1 = plt.figure(1, figsize=(35,20))### 
         step = 2.5
         ax = fig1.add_subplot(111, aspect='equal')
         im1 = plt.imread(picture)
@@ -612,20 +593,36 @@ def final_frame():
 
 def strip(fes):
     param = parameters()
-    if os.path.exists('fes_'+str(fes)+'.dat'):
-        if not os.path.exists('energies_location-'+str(fes)):
-            start_time = time.time()
-            x,y,z=readfes('fes_'+str(fes)+'.dat')
-            print('read in',fes, np.round(time.time() - start_time, 2))
-            bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l,sorted_x, sorted_y = bulk_val(x,y,z)
-            print('got bulk',  np.round(time.time() - start_time, 2))
-            line=str(fes)+'\t'+str(bulk)+'\t'
-            with open('energies_location-'+str(fes), 'w') as enloc:
+    if os.path.exists(param['prefix']+str(fes)+'.dat'):
+        x,y,z, e=readfes(param['prefix']+str(fes)+'.dat')
+        start_time = time.time()
+        bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = bulk_val(x,y,z)
+        output=[fes,bulk]
+        if param['circle_plot'] or param['ellipse_plot']:
+            if len(param['ring_location']) > 0:
                 for val, ring in enumerate(param['ring_location']):
-                    minima=np.where(np.sqrt(((ring[0]-x)**2)+((ring[1]-y)**2)) <= param['area'][val])
-                    line+=str(np.round(min(z[minima])-bulk,4))+'\t'
-                enloc.write(line+'\n')
-            print('got energy', np.round(time.time() - start_time, 2))
+                    if param['circle_plot']:
+                        minima=np.where(np.sqrt(((ring[0]-x)**2)+((ring[1]-y)**2)) <= param['circle_area'][val])
+                    elif param['ellipse_plot']:
+                        minima=ellipse_check_point(x, y, ring, param['ellipse_width'][val], param['ellipse_height'][val], param['ellipse_angle'][val])
+                    output.append(np.round(min(z[minima])-bulk,4))
+                return output
+            else:
+                sys.exit('No locations specified')
+        else:
+            sys.exit('Ellipse or circle not been selected')
+
+def ellipse_check_point(x, y, center, width, height, angle):
+    cos_angle = np.cos(math.pi-np.radians(angle))
+    sin_angle = np.sin(math.pi-np.radians(angle))
+    xc = x - center[0]
+    yc = y - center[1]
+    xct = xc * cos_angle - yc * sin_angle
+    yct = xc * sin_angle + yc * cos_angle 
+    rad_cc = (xct**2/(width/2.)**2) + (yct**2/(height/2.)**2)
+    colors_array = []
+    minima = np.where(rad_cc < 1)
+    return minima
 
 @jit(nopython=True)
 def bootstrap(z):
@@ -636,7 +633,7 @@ def bootstrap(z):
 
 def average_fes(fes, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l):
     start_time = time.time()
-    x,y,z=readfes('fes_'+str(fes)+'.dat')
+    x,y,z, e=readfes(param['prefix']+str(fes)+'.dat')
     shuffledxy = np.stack((x,y), axis=-1)
     bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = find_bulk(x,y,z,shuffledxy,sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l)
     z[ z==0 ] = np.nan
@@ -644,11 +641,10 @@ def average_fes(fes, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l):
     print(fes, time.time() - start_time)
     os.system("touch landscapes_done_temp/fes_"+str(fes))
 
-
     return x,y,z
 
 def get_frames(run):
-
+    param =parameters()
     ring_location=[[-0.3,1.83], [1.807,0.399],[2.178,-0.107],[-0.25,-2.2],[-2.13,-0.097]] # kir
     area=[0.5,0.3,0.3,0.5,0.5]
     os.chdir('kir2_meta_r'+str(run))
@@ -726,7 +722,6 @@ def strip_1d(x,y,z, x_points, y_points, distance, invert):
         slope, intercept, r_value, p_value, std_err = stats.linregress(x_points,y_points)
         perp_slope=(-1/slope)
         perp_intercept=(perp_slope*x_points[0]-y_points[0])*-1
-        print(1, distance)
         if x_points[1] < x_points[0]:
             line_x = np.array(x_points[0]-CV*np.sqrt(1/(1+slope**2)))
             line_y = np.array(y_points[0]-CV*slope*np.sqrt(1/(1+slope**2)))
@@ -745,7 +740,6 @@ def strip_1d(x,y,z, x_points, y_points, distance, invert):
         if x_points[0]==x_points[1]:
             line_x = np.array(x_points[0]+np.zeros(len(CV)))
             line_y = np.array(y_points[0]+CV)
-            print(2, distance)
             for val, y_val in enumerate(CV):
                 point_lower_x= np.append(point_lower_x, x_points[0]-distance)
                 point_lower_y= np.append(point_lower_y, y_points[0]+y_val)
@@ -754,7 +748,6 @@ def strip_1d(x,y,z, x_points, y_points, distance, invert):
         if y_points[0]==y_points[1]:
             line_x = np.array(x_points[0]+CV)
             line_y = np.array(y_points[0]+np.zeros(len(CV)))
-            print(3, distance)
             for val, x_val in enumerate(CV):
                 point_lower_x= np.append(point_lower_x, x_points[0]+x_val)
                 point_lower_y= np.append(point_lower_y, y_points[0]-distance)
@@ -768,10 +761,10 @@ def strip_1d(x,y,z, x_points, y_points, distance, invert):
     return np.sqrt(((xyz[:,3]-float(line_x[0]))**2)+((xyz[:,4]-float(line_y[0]))**2)), xyz[:,0]*invert, xyz[:,1], xyz[:,2],point_lower_x,point_lower_y,point_upper_x,point_upper_y
 
 
-def average_1d(protein, fes_frame):   ### not tested
+def average_1d(fes_frame):   ### not tested
     start_time = time.time()
-    search_width, fes, invert,x_points, y_points,minz,ring_location,area, step, picture, picture_loc, lim_ux, lim_ly, label_loc_x, label_loc_y = parameters(args.p)
-    x,y,z,e=readfes('fes_'+str(fes_frame)+'.dat')
+    param = parameters()
+    x,y,z,e=readfes(param['prefix']+str(fes_frame)+'.dat')
     try:  ### reads bulk value file to get bulk area
         coord=np.genfromtxt('bulk_values', autostrip=True)
         sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l=coord[:,0],coord[:,1],coord[:,2],coord[:,3]
@@ -782,22 +775,20 @@ def average_1d(protein, fes_frame):   ### not tested
         bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = bulk_val(x,y,z)
         # z[ z==0 ] = np.nan
         z=np.clip(z-bulk,np.nanmin(z)-bulk,20)
-    for val, x_points_start in enumerate(x_points):
-        if not os.path.exists('1D_landscape_site-'+str(val+1)+'_'+str(fes_frame)):
-            distance,d1x,d1y,d1z,point_lower_x,point_lower_y,point_upper_x,point_upper_y = strip_1d(x,y,z, x_points_start, y_points[val], search_width, invert)
-            with open('1D_landscape_site-'+str(val+1)+'_'+str(fes_frame), 'w') as landscape:
+    for val, x_points_start in enumerate(param['x_points']):
+        if not os.path.exists(param['1d_location']+'/1D_landscape_site-'+str(val+1)+'_'+str(fes_frame)):
+            distance,d1x,d1y,d1z,point_lower_x,point_lower_y,point_upper_x,point_upper_y = strip_1d(x,y,z, x_points_start, param['y_points'][val], param['search_width'], param['invert'])
+            with open(param['1d_location']+'/1D_landscape_site-'+str(val+1)+'_'+str(fes_frame), 'w') as landscape:
                 for line in range(len(distance)):
                     landscape.write(str(np.round(distance[line],3))+'\t'+str(d1z[line])+'\t'+str(np.round(d1x[line],5))+'\t'+str(np.round(d1y[line],5))+'\n')
             landscape.close()
-    print(fes_frame, time.time()-start_time)
-    # for proc in psutil.process_iter():
-    #   print(proc.open_files())
-    #   print(proc.get_open_files())
+    print(fes_frame, np.round(time.time()-start_time, 2))
+
 
 
 def bootstrap_1d():
     param = parameters()
-    for site in range(1,len(param['ring_location'])+1):
+    for site in range(1,len(param['x_points'])+1):
         init=True
         energy=[]
         files_range=[]
@@ -806,62 +797,52 @@ def bootstrap_1d():
                 if '1D_landscape_site-'+str(site)+'_' in filename :
                     files_range.append(filename)
             break
-
         for fes_frame in files_range:
             if int(fes_frame.split('_')[3]) > param['equilibration']/param['stride']:
                 data=np.genfromtxt(fes_frame)
 
-                bulk=np.where(np.logical_and(data[:,0]>cutoff[site-1]-cut, data[:,0]<cutoff[site-1]))
+                bulk=np.where(np.logical_and(data[:,0]>param['cutoff'][site-1]-param['cut'], data[:,0]<param['cutoff'][site-1]))
                 bulk_val=(np.mean(data[:,1][bulk]))
                 data[:,1]=data[:,1]-bulk_val
                 if init:
                     init=False
-                    landscapes = {str(np.round(CV,3)): [] for CV in np.linspace(0,3.5,700,endpoint=False)}
+                    landscapes = {str(np.round(CV,3)): [] for CV in np.linspace(0,np.max(data[:,0])+0.05,(np.max(data[:,0])+0.05)*200,endpoint=False)}
                 for val,CV in enumerate(data[:,0]):
                     landscapes[str(CV)].append(data[:,1][val])
             else:
                 pass
-        #   plt.figure(2, figsize=(20,30))
-            # if np.mean(data[:,1][bulk])< -0.1 or np.mean(data[:,1][bulk]) > 0.1:
-            #   print(bulk_val, np.mean(data[:,1][bulk]))
-        #   plt.plot(data[:,0],data[:,1], linewidth=1)
-        # plt.show()
         for CV in np.linspace(0,3.5,700,endpoint=False):
-            if len(landscapes[str(np.round(CV,3))]) >2 and CV < cutoff[site-1] and CV > min_cv[site-1]:
+            if len(landscapes[str(np.round(CV,3))]) >2 and CV < param['cutoff'][site-1] and CV > param['min_cv'][site-1]:
                 bs_sample = np.random.choice(landscapes[str(np.round(CV,3))], size=10000)#len(boot_strap_data))
                 energy.append([np.round(CV,3), np.mean(bs_sample), np.std(bs_sample)])
         energy=np.array(energy)
         plt.figure(1, figsize=(20,20))
-        plt.subplot(len(ring_location),1,site)      
-        cutoff_new = float(cutoff[site-1]-energy[:,0][np.where(energy[:,1]==np.min(energy[:,1]))])
+        plt.subplot(len(param['ring_location']),1,site)      
+        cutoff_new = float(param['cutoff'][site-1]-energy[:,0][np.where(energy[:,1]==np.min(energy[:,1]))])
         energy[:,0] = energy[:,0] - energy[:,0][np.where(energy[:,1]==np.min(energy[:,1]))]
         cutoff_max = energy[:,0][np.where(energy[:,1]==np.min(energy[:,1]))]
 
         if cutoff_max < np.max(energy[:,0]):
             cutoff_max=np.max(energy[:,0])
-        plt.title('Site '+str(site) ,  fontproperties=font1, fontsize=40,y=title_height)#+' gaussian height'
+        plt.title('Site '+str(site) ,  fontproperties=font1, fontsize=40,y=param['title_height'])#+' gaussian height'
 
         plt.plot(energy[:,0], energy[:,1], linewidth=3, color='red')
         plt.fill_between(energy[:,0], energy[:,1]-energy[:,2], energy[:,1]+energy[:,2], alpha=0.3, facecolor='black')
-        error=np.mean(energy[:,2][np.where(np.logical_and(energy[:,0]>cutoff_new-cut,energy[:,0]<cutoff_new))])+energy[:,2][np.where(energy[:,1]==np.min(energy[:,1]))]
-        plt.annotate(str(int(np.round(np.min(energy[:,1]),0)))+' $\pm$ '+str(int(np.round(error,0)))+' kJ mol$^{-1}$', xy=(cutoff_max-0.1, lab_y), size =25, bbox=bbox, ha="right", va="top")
-        plt.yticks(np.arange(-100, 21,step), fontproperties=font1,  fontsize=35)
+        error=np.mean(energy[:,2][np.where(np.logical_and(energy[:,0]>cutoff_new-param['cut'],energy[:,0]<cutoff_new))])+energy[:,2][np.where(energy[:,1]==np.min(energy[:,1]))]
+        plt.annotate(str(int(np.round(np.min(energy[:,1]),0)))+' $\pm$ '+str(int(np.round(error,0)))+' kJ mol$^{-1}$', xy=(cutoff_max-0.1, param['lab_y']), size =25, bbox=bbox, ha="right", va="top")
+        plt.yticks(np.arange(-500, param['energy_max']+1,param['step_yaxis']), fontproperties=font1,  fontsize=35)
         plt.xticks(np.arange(-3, 10,0.5), fontproperties=font1,  fontsize=35)#
-        if site<len(ring_location):
+        if site<len(param['ring_location']):
             plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=35, direction='in', pad=10, right=False, top=False,labelbottom=False)
         else:
             plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=35, direction='in', pad=10, right=False, top=False)
-            plt.xlabel('CV (nm)', fontproperties=font2,fontsize=labels_size) 
+            plt.xlabel('CV (nm)', fontproperties=font2,fontsize=param['labels_size']) 
 
-        plt.ylabel('Energy \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size) 
+        plt.ylabel('Energy \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=param['labels_size']) 
         # plt.xlim(0,cutoff)
-        plt.xlim(np.min(energy[:,0],cutoff_max)
-        plt.ylim(lim_ly,20)
-    plt.savefig('energy_landscape_sites_1d_'+args.p+'.png', dpi=300)
-
-
-    # plt.figure(2, figsize=(20,30))
-    # plt.plot(data[:,2],data[:,3], linewidth=3, color='red')
+        plt.xlim(np.min(energy[:,0]),cutoff_max)
+        plt.ylim(np.min(energy[:,1])*1.1,20)
+    plt.savefig(param['1d_location']+'/energy_landscape_sites_1d.png', dpi=300)
     plt.show()
 
 
@@ -870,19 +851,15 @@ def plot_CV():
     plt.rcParams['mathtext.default'] = 'regular'
     plt.rcParams['axes.linewidth'] = 3
     hills_files=[]
-    search_width, fes, invert,x_points, y_points,minz,ring_location,area, step, picture, picture_loc, lim_ux, lim_ly, label_loc_x, label_loc_y = parameters(args.p)  ## parameter for protein
-
-    for walker in range(0,20):
+    params = parameters()  ## parameter for protein
+    for walker in range(int(param['walker_range'][0]),int(param['walker_range'][1])+1):
         if os.path.exists('HILLS.'+str(walker)):
             hills_files.append('HILLS.'+str(walker))    
     hills_x, hills_y=hills_files.copy(), hills_files.copy()
     time, dx, dy, gau=[],[],[],[]
     count=0
     check=False
-    if args.p == 'leut':
-        fig1 = plt.figure(1, figsize=(28.2,20)) 
-    else:
-        fig1 = plt.figure(1, figsize=(17.9,20))
+    fig1 = plt.figure(1, figsize=(17.9,20))
     for hill_val, hills_file in enumerate(hills_files):
         hills_x[hill_val], hills_y[hill_val]=[],[]
         try:
@@ -897,28 +874,21 @@ def plot_CV():
             print(hill_val)
         except:
             break
-        if args.p == 'lpt':
-            ax1 = fig1.add_subplot(3,4, hill_val+1, aspect='equal')
-        else:
-            ax1 = fig1.add_subplot(5,4, hill_val+1, aspect='equal')
+        ax1 = fig1.add_subplot(5,4, hill_val+1, aspect='equal')
         plt.title(str(hill_val+1) ,  fontproperties=font1, fontsize=20,y=0.9)
+        if param['circle_plot'] or param['ellipse_plot']:
+            for val, ring in enumerate(param['ring_location']):
+                if param['circle_plot']:
+                    circle = plt.Circle((ring[0],ring[1]), area[val],linewidth=2,edgecolor='k',facecolor='none', zorder=2)
+                    ax1.add_artist(circle)
+                if param['ellipse_plot']:
+                    ellipse = patches.Ellipse(xy=(ring[0],ring[1]), width=param['ellipse_width'], height=param['ellipse_height'], angle=param['ellipse_angle'],linewidth=10,edgecolor='k',facecolor='none', zorder=2) 
+                    ax1.add_artist(ellipse)
 
-
-        # if circle_plot==True:
-            # circle = plt.Circle((0,0, area[val],linewidth=10,edgecolor='k',facecolor='none', zorder=2)
-        for val, ring in enumerate(ring_location):
-                circle = plt.Circle((ring[0],ring[1]), area[val],linewidth=2,edgecolor='k',facecolor='none', zorder=2)
-                ax1.add_artist(circle)
         ran=np.linspace(0,1,len(hills_x[hill_val]))
         ax1.scatter(hills_x[hill_val], hills_y[hill_val],s=1,c = cm.coolwarm(ran))
         plt.yticks(np.arange(-10, 10,2), fontproperties=font1,  fontsize=20)#
         plt.xticks(np.arange(-10, 10,2), fontproperties=font1,  fontsize=20)#
-        if args.p == 'leut':
-            plt.xlim(-7.9, 7.9);plt.ylim(-5,5)
-        elif args.p == 'lpt':
-            plt.xlim(-3,3);plt.ylim(-8, 8)
-        else:
-            plt.xlim(-5,5);plt.ylim(-5, 5)
         rows=[1,5,9,13,17]
         lef, bot=False,False    
         if hill_val+1 in rows:
@@ -929,82 +899,37 @@ def plot_CV():
             bot=True  
         ax1.tick_params(axis='both', which='major', width=3, length=5, labelsize=20, direction='in', pad=10 , labelbottom=bot, labelleft=lef,right=True, top=True, left=True, bottom=True)
         plt.subplots_adjust(left=0.1, wspace=0, hspace=0, top=0.975, bottom=0.08)
-        # if hill_val ==8:
-        #   break
     plt.savefig('hills_trace.png', dpi=300)
     plt.show()
 
 def timecourse():
-    search_width, fes, invert,x_points, y_points,minz,ring_location,area, step, picture, picture_loc, lim_ux, lim_ly, label_loc_x, label_loc_y = parameters(args.p)  ## parameter for protein
-    lim_ly=-20
-    lab_y= -10
-    cutoff_max=0
-    cutoff_min = 0
-    if args.p=='kir':
-        ring_location=[1,2,3,4]
-        
-    labels=35   #energy label
-    title_height=0.80 #0.75
-    labels_size=35
+    param = parameters()  ## parameter for protein
     plt.close()
     min_energy=0
     count=0
     run_ylim=False
     plt.figure(1, figsize=(20,10))
-    for site in range(1,len(ring_location)+1):
+    for site in range(1,len(param['x_points'])+1):
         count+=1
-        if site==len(ring_location):
+        if site==len(param['x_points']):
             run_ylim=True
-        if args.p == 'leut':# and site in [1,3]:
-            min_cv=[0,0,0.1,0]
-            cutoff=[2.8, 2.1, 2.8, 2.3]
-            cut=0.3
-
-            step=10
-        elif args.p == 'kir':
-            min_cv=[0,0,0,0.3]
-            lim_ly=-70
-            lab_y= -25
-            step=20
-            cutoff=[3.1,3.1,3.1,3.1]
-            cut=0.3
-        elif args.p == 'a2a':
-            min_cv=[0.1,0.2,0.2]
-            cutoff=[2,2,2]
-            cut=0.3
-            step=10
-        elif args.p == 'aac':
-            min_cv=[0,0,0.1]
-            cutoff=[2.5,2.5,2.5]
-            cut=0.6
-            step=10
-        else:
-            min_cv=[0,0.1,0]
-            cutoff=[2.8, 2.8]
-            cut=0.3
-            step=10         
-
-        init=True
         energy=[]
         files_range, number_range=[],[]
-        si=site
-        if site==2:
-            si+=1
-        for root, dirs, files in os.walk('.'):
+        for root, dirs, files in os.walk(param['1d_location']):
             for filename in files:
-                if '1D_landscape_site-'+str(si)+'_' in filename :
+                if '1D_landscape_site-'+str(site)+'_' in filename :
                     files_range.append(filename)
                     number_range.append(int(filename.split('_')[3]))
             break
         number_range=np.sort(number_range)
         print(min(number_range), max(number_range))
-        # print(number_range)
         energy_min=np.array([])
         for f in number_range:
-            data=np.genfromtxt('1D_landscape_site-'+str(site)+'_'+str(f), autostrip=True)
+            data=np.genfromtxt(param['1d_location']+'/1D_landscape_site-'+str(site)+'_'+str(f), autostrip=True)
             try:
-                bulk=np.where(np.logical_and(data[:,0]>cutoff[site-1]-cut, data[:,0]<cutoff[site-1]))
+                bulk=np.where(np.logical_and(data[:,0]>param['cutoff'][site-1]-cut, data[:,0]<param['cutoff'][site-1]))
             except:
+                pass
                 print(site, f)
                 print(len(cutoff))
                 print(cutoff[site-1]-cut, cutoff[site-1])
@@ -1038,8 +963,8 @@ def timecourse():
     # plt.show()
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-f', help='function',metavar='plot',type=str, choices= ['sort', 'skip', 'plot', 'boot', 'concat','strip', 'converge', 'frames', '1d_times', 'cv_plot', 'timecourse'])
-parser.add_argument('-input', help='name of input variables',metavar='protein',type=str)
+parser.add_argument('-f', help='function',metavar='plot',type=str, choices= ['sort', 'skip', 'plot', 'boot', 'concat','strip', 'converge', 'frames', '1d_time', 'cv_plot', 'timecourse'], required=True)
+parser.add_argument('-input', help='name of input variables',metavar='protein',type=str, required=True)
 parser.add_argument('-save', help='save name',metavar='FES',type=str)
 parser.add_argument('-d1', help='plots 1d landscape', action='store_true')
 parser.add_argument('-bulk', help='plots bulk outline', action='store_true')
@@ -1051,6 +976,7 @@ parser.add_argument('-e', help='end',metavar='10',type=int)
 args = parser.parse_args()
 options = vars(args)
 
+param = parameters()
 ### working
 if args.f == 'sort':
     os.system("awk \'{print $NF,$0}\' HILLS | sort -n | cut -f2- -d\' \' > HILLS_sorted")
@@ -1063,9 +989,6 @@ if args.f == 'skip':
 if args.f == 'plot':
     final_frame()
 
-if args.f == 'boot':
-    bootstrap_1d()
-
 #### average z across frames
 if args.f== 'concat':
     start, end=args.s,args.e
@@ -1073,13 +996,13 @@ if args.f== 'concat':
         coord=np.genfromtxt('bulk_values', autostrip=True)
         sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l=coord[:,0],coord[:,1],coord[:,2],coord[:,3]
     else:
-        x,y,z,e=readfes('fes_'+str(end)+'.dat')
+        x,y,z,e=readfes(param['prefix']+str(end)+'.dat')
         bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = bulk_val(x,y,z)
-    
-    os.system('rm -r landscapes_done_temp')
+    if os.path.exists('landscapes_done_temp'):
+        os.system('rm -r landscapes_done_temp')
     os.mkdir('landscapes_done_temp')    
     pool = mp.Pool(mp.cpu_count())
-    xyz = pool.starmap_async(average_fes, [(frame, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l) for frame in range(start,end)]).get()
+    xyz = pool.starmap_async(average_fes, [(frame, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l) for frame in range(start,end+1)]).get()
     pool.close
     xyz = np.array(xyz)
 
@@ -1095,52 +1018,48 @@ if args.f== 'concat':
         for line in range(len(xyz[0][0])):
             fes_averaged.write(str(xyz[0][0][line])+'   '+str(xyz[0][1][line])+'   '+str(zboot[:,0][line])+'   '+str(zboot[:,1][line])+'\n')        
 
-
-#### 
-
 ### get values from timepoints
 if args.f == 'strip':
     start, end=args.s,args.e
     pool = mp.Pool(mp.cpu_count())
-    pool.map_async(strip, [row for row in range(start,end)]).get()
+    timecourse = pool.map_async(strip, [row for row in range(start,end+1)]).get()
     pool.close
+    sorted_timecourse = sorted(timecourse, key = lambda x:(x[0]))
+    with open('energies_time', 'w') as enloc:
+        for line in sorted_timecourse:
+            line_outputs=''
+            for value in line:
+                line_outputs+=str(value)+'   '
+            enloc.write(line_outputs+'\n')
 
 if args.f == 'converge':
     hills_converge()
 
-if args.f == 'frames':
-    start, end=1,21
+if args.f == 'frames':  ## needs updating
     start, end= args.s, args.e
     for i in range(start,end):
         get_frames(i)
 
 if args.f == '1d_time':
-    start, end = 326, 663
-    # start, end = 171,742
-    # start, end = 60, 491
-    # start, end = 400, 500
-    # start, end = 400,403
-    # start, end = 600,601
-    start, end= 600,602
-
+    if not os.path.exists(param['1d_location']):
+        os.mkdir(param['1d_location'])
     start, end= args.s, args.e
     frames=[]
-    for fes_frame in range(start,end):
-        if os.path.exists('fes_'+str(fes_frame)+'.dat'):
+    for fes_frame in range(start,end+1):
+        if os.path.exists(param['prefix']+str(fes_frame)+'.dat'):
             cont=False
-            for site in range(1,5):
-                if not os.path.exists('1D_landscape_site-'+str(site)+'_'+str(fes_frame)):
+            for site in range(1,len(param['ring_location'])+1):
+                if not os.path.exists(param['1d_location']+'/1D_landscape_site-'+str(site)+'_'+str(fes_frame)):
                     cont=True
                     break
             if cont==True:
                 frames.append(fes_frame)
-    print(frames)
     if len(frames) >= 1: 
         for frame in frames:
-            average_1d(args.p, frame)
-        # pool = mp.Pool(mp.cpu_count())
-        # pool.starmap_async(average_1d, [(args.p, frame) for frame in frames]).get()
-        # pool.close
+            average_1d(frame)
+
+if args.f == 'boot':
+    bootstrap_1d()
 
 if args.f == 'cv_plot':
     plot_CV()
