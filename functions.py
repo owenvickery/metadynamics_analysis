@@ -64,10 +64,52 @@ cmaps = [('Perceptually Uniform Sequential', [
             'gist_rainbow', 'rainbow', 'jet', 'nipy_spectral', 'gist_ncar'])]
 
 
-def report_complete(size, resid):
-    print('                                                                                                       ', end='\r')
-    print('Concatonating '+str(resid)+' : percentage complete: ',np.round((size/resid)*100,2),'%', end='\r')
-    time.sleep(0.1)
+def parameters(input_file, setting, param):
+    if os.path.exists(input_file):
+        with open(input_file, 'r') as param_input:
+            for line_nr, line in enumerate(param_input.readlines()):
+                if not line.startswith('#'):
+                    line_sep = line.split('#')[0].split('=') 
+                    variable = line_sep[0].strip()
+                    if variable in setting:
+                        param[variable] = split_setting(variable, line_sep[-1])
+    else:
+        sys.exit('cannot find parameter file: '+args.input)
+    return param
+
+def check_variable(setting, param):
+    for var in setting:
+        if var not in param:
+            sys.exit('The variable '+var+' is missing')
+
+def split_setting(variable, setting):
+    string_variables = ['fes', 'picture_file', 'bulk_values', 'CV1', 'CV2', 'prefix', '1d_location', 'HILLS_skipped']
+    int_variables = ['start', 'end']
+    float_variables = ['invert','minz','step','lim_ux','lim_ly','label_loc_x','label_loc_y','title_height','lab_y', 'labels_size', 'step_yaxis',
+                       'interval_x', 'interval_y','energy_max', 'colour_bar_tick', 'search_width','cut', 'equilibration', 'stride']
+    complex_variables = ['x_points', 'y_points', 'ring_location']
+    list_variables = ['picture_loc', 'min_cv', 'cutoff', 'circle_area', 'ellipse_height', 'ellipse_width', 'ellipse_angle', 'cutoff', 
+                      'min_cv', 'walker_range']
+    T_F_variables = ['circle_plot','ellipse_plot', 'picture', '1d', 'bulk_outline']
+    if variable in string_variables:
+        return str(setting.strip())
+    elif variable in int_variables:
+        return int(setting.strip()) 
+    elif variable in float_variables:
+        return float(setting.strip())    
+    elif variable in T_F_variables:
+        if setting.strip().lower() in ['true','1', 't', 'y', 'yes']:
+            return True
+        else:
+            return False
+    elif variable in list_variables:
+        return np.array([float(x) for x in setting.strip().split(',')])
+    elif variable in complex_variables:
+        l = np.array([float(i) for x in setting.strip().split() for i in x.split(',')])
+        return l.reshape(int(len(l)/2), 2)
+    else:
+        sys.exit('The variable '+variable+'is not correct')
+
 
 def gromacs(cmd):
     print('\nrunning gromacs: \n '+cmd)
@@ -274,7 +316,12 @@ def hills_converge(param):
 
     lab=[]
     time, dx, dy,gau = readhills(param['HILLS_skipped'])
-    time_bulk ,bulk = read_bulk('bulk_values',time, dx, dy,gau)
+    time_bulk ,bulk = read_bulk(param['bulk_values'],time, dx, dy,gau)
+
+    if 'ring_location' not in param:
+        plot_numbers=2
+    else:
+        plot_numbers=2+len(param['ring_location'])
     lim_ux=max(time)+2
     if os.path.exists('energies_time'):
         sites = np.genfromtxt('energies_time')
@@ -282,7 +329,7 @@ def hills_converge(param):
     start = np.argmax(ave(bulk, 10)<np.max(gau)*0.05)
     plt.figure(1, figsize=(20,30))
 
-    plt.subplot(2+len(param['ring_location']),1,1)
+    plt.subplot(plot_numbers,1,1)
     plt.title('Raw gaussian height' ,  fontproperties=font1, fontsize=40,y=1.05)
     # plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
     plt.plot(time,gau, color='blue',linewidth=4)
@@ -293,7 +340,7 @@ def hills_converge(param):
     plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
     plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size)
 
-    plt.subplot(2+len(param['ring_location']),1,2)
+    plt.subplot(plot_numbers,1,2)
     plt.title('Bulk gaussian height' ,  fontproperties=font1, fontsize=40,y=title_height)
     plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
     plt.plot(time_bulk ,bulk, color='blue',linewidth=4)
@@ -304,52 +351,53 @@ def hills_converge(param):
     plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
     plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size) 
     # plt.xlabel('Time ($\mu$s)', fontproperties=font2,fontsize=30)
-    for val, fig_num in enumerate(range(3,2+len(param['ring_location'])*2,2)): 
-        if param['circle_plot']:
-            center=np.where(np.sqrt(((param['ring_location'][val][0]-dx)**2)+((param['ring_location'][val][1]-dy)**2)) <= param['circle_area'][val])
-        elif param['ellipse_plot']:
-            center=ellipse_check_point(dx, dy, param['ring_location'][val], param['ellipse_width'][val], param['ellipse_height'][val], param['ellipse_angle'][val])
+    if param['circle_plot'] or param['ellipse_plot']:
+        for val, fig_num in enumerate(range(3,2+len(param['ring_location'])*2,2)): 
+            if param['circle_plot']:
+                center=np.where(np.sqrt(((param['ring_location'][val][0]-dx)**2)+((param['ring_location'][val][1]-dy)**2)) <= param['circle_area'][val])
+            elif param['ellipse_plot']:
+                center=ellipse_check_point(dx, dy, param['ring_location'][val], param['ellipse_width'][val], param['ellipse_height'][val], param['ellipse_angle'][val])
 
 
 
 
 
-        # for time_interval in range(0, 130, 10):
-        #     try:
-        #         average_ind=np.where(np.logical_and(time_energy>ave(time_bulk, 10)[start],time_energy<ave(time_bulk, 10)[start]+time_interval))
-        #     except:
-        #         average_ind=np.where(time_energy>ave(time_bulk, 10)[start])
-        #         break
-        plt.subplot(2+len(param['ring_location']),1,val+3)
-        plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
+            # for time_interval in range(0, 130, 10):
+            #     try:
+            #         average_ind=np.where(np.logical_and(time_energy>ave(time_bulk, 10)[start],time_energy<ave(time_bulk, 10)[start]+time_interval))
+            #     except:
+            #         average_ind=np.where(time_energy>ave(time_bulk, 10)[start])
+            #         break
+            plt.subplot(2+len(param['ring_location']),1,val+3)
+            plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
 
-        plt.title('Site '+str(val) ,  fontproperties=font1, fontsize=40,y=title_height)#+' gaussian height'
+            plt.title('Site '+str(val) ,  fontproperties=font1, fontsize=40,y=title_height)#+' gaussian height'
 
-        plt.scatter(time[center],gau[center], s=100, color='blue')
-        plt.scatter(ave(time[center], 10), ave(gau[center], 10), s=25, alpha=0.3, color='red')
-        plt.yticks(np.arange(0, 1.21,0.4), fontproperties=font1,  fontsize=35)
-        plt.xticks(np.arange(0, 200,10), fontproperties=font1,  fontsize=35)#
-        plt.ylim(-0.1,1.2);plt.xlim(-2, lim_ux)
-        # plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
-        plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size) 
+            plt.scatter(time[center],gau[center], s=100, color='blue')
+            plt.scatter(ave(time[center], 10), ave(gau[center], 10), s=25, alpha=0.3, color='red')
+            plt.yticks(np.arange(0, 1.21,0.4), fontproperties=font1,  fontsize=35)
+            plt.xticks(np.arange(0, 200,10), fontproperties=font1,  fontsize=35)#
+            plt.ylim(-0.1,1.2);plt.xlim(-2, lim_ux)
+            # plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
+            plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size) 
 
-        # plt.subplot(2+len(ring_location)*2,1,fig_num+1)
-        # # plt.title('site '+str(s+1)+' free energy' ,  fontproperties=font1, fontsize=35,y=0.6)
-        # plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
-        # plt.scatter(time_energy, sites[:,rin], s=100, color='blue')
-        # plt.plot(time_energy, sites[:,rin], color='red')#,label=str(np.round(np.mean(sites[:,rin][average_ind]),1))+'  '+str(np.round(np.std(sites[:,rin][average_ind]),1)))
-        # plt.scatter(time_energy, sites[:,rin], s=100)
-        # plt.yticks(np.arange(-100, 21,20), fontproperties=font1,  fontsize=30)
-        # plt.xticks(np.arange(0, 200,10), fontproperties=font1,  fontsize=30)#
-        # plt.ylim(lim_ly,20);plt.xlim(-2, lim_ux)
-        # if val+3 != 2+len(ring_location):
-        #   plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
-        # else:
-        #   plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False)
+            # plt.subplot(2+len(ring_location)*2,1,fig_num+1)
+            # # plt.title('site '+str(s+1)+' free energy' ,  fontproperties=font1, fontsize=35,y=0.6)
+            # plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
+            # plt.scatter(time_energy, sites[:,rin], s=100, color='blue')
+            # plt.plot(time_energy, sites[:,rin], color='red')#,label=str(np.round(np.mean(sites[:,rin][average_ind]),1))+'  '+str(np.round(np.std(sites[:,rin][average_ind]),1)))
+            # plt.scatter(time_energy, sites[:,rin], s=100)
+            # plt.yticks(np.arange(-100, 21,20), fontproperties=font1,  fontsize=30)
+            # plt.xticks(np.arange(0, 200,10), fontproperties=font1,  fontsize=30)#
+            # plt.ylim(lim_ly,20);plt.xlim(-2, lim_ux)
+            # if val+3 != 2+len(ring_location):
+            #   plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False,labelbottom=False)
+            # else:
+            #   plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=30, direction='in', pad=10, right=False, top=False)
 
-        # plt.ylabel('Energy \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size) 
-        # plt.annotate(str(int(np.round(np.mean(sites[:,rin][average_ind]),0)))+' $\pm$ '+str(int(np.round(np.std(sites[:,rin][average_ind]),0)))+' kJ mol$^{-1}$', xy=(label_loc_x, label_loc_y), size =labels, bbox=bbox, ha="right", va="top")
-        # rin+=1
+            # plt.ylabel('Energy \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=labels_size) 
+            # plt.annotate(str(int(np.round(np.mean(sites[:,rin][average_ind]),0)))+' $\pm$ '+str(int(np.round(np.std(sites[:,rin][average_ind]),0)))+' kJ mol$^{-1}$', xy=(label_loc_x, label_loc_y), size =labels, bbox=bbox, ha="right", va="top")
+            # rin+=1
     plt.xlabel('Time ($\mu$s)', fontproperties=font2,fontsize=labels_size)
     plt.subplots_adjust( top=0.955, bottom=0.075, left=0.12,right=0.97, wspace=0.4, hspace=0.18)
 
@@ -370,45 +418,6 @@ def set_to_zero(energy):
         # print(energy[-20:-1])
     return energy
 
-def parameters(input_file):
-    param={'circle_plot':False,'ellipse_plot':False, 'picture':False, '1d':False, 'bulk_outline':False, 'prefix':'fes_', '1d_location':'1d_landscapes'}
-    if os.path.exists(input_file):
-        with open(input_file, 'r') as param_input:
-            for line_nr, line in enumerate(param_input.readlines()):
-                if not line.startswith('#'):
-                    line_sep=line.split('#')[0].split('=') #.split('#')[0] 
-                    variable = line_sep[0].strip()
-                    if variable in ['picture_loc', 'min_cv', 'cutoff', 'circle_area', 'ellipse_height', 'ellipse_width', 'ellipse_angle', 'cutoff', 
-                                    'min_cv', 'walker_range']:
-                        l = np.array([float(x) for x in line_sep[-1].strip().split(',')])
-                        param[variable]=l
-
-                    elif variable in ['x_points', 'y_points', 'ring_location']:
-                        l = np.array([float(i) for x in line_sep[-1].strip().split() for i in x.split(',')])
-                        lr = l.reshape(int(len(l)/2), 2)
-                        param[variable]=lr
-
-                    elif variable in ['fes', 'picture_file', 'bulk_values', 'CV1', 'CV2', 'prefix', '1d_location', 'HILLS_skipped']:
-                        param[variable]=str(line_sep[-1].strip())
-
-                    elif variable in ['invert','minz','step','lim_ux','lim_ly','label_loc_x','label_loc_y','title_height','lab_y', 'labels_size', 'step_yaxis',
-                                      'interval_x', 'interval_y','energy_max', 'colour_bar_tick', 'search_width','cut', 'equilibration', 'stride']:
-                        param[variable]=float(line_sep[-1].strip())
-
-                    elif variable in ['start', 'end']:
-                        param[variable]=int(line_sep[-1].strip())
-
-                    elif variable in ['circle_plot','ellipse_plot', 'picture', '1d', 'bulk_outline']:
-                        if line_sep[-1].strip().lower() in ['true','1', 't', 'y', 'yes']:
-                            param[variable]=True
-                        else:
-                            param[variable]=False
-                    else:
-                        pass
-    else:
-        sys.exit('cannot find parameter file: '+args.input)
-    return param
-
 def find_min(floatz):
     minz=np.round(floatz,-1)
     if minz>=floatz:
@@ -416,10 +425,10 @@ def find_min(floatz):
     return minz
 
 
-def final_frame(param, error, save_plot, d1):
+def final_frame(param, error, save_plot):
 ### intialisation
     start_plot=time.time()
-    if error==False:
+    if not error:
         fig1 = plt.figure(1, figsize=(35,20))
         ax1 = fig1.add_subplot(111)#, aspect='equal')
     ### add picture
@@ -529,7 +538,7 @@ def final_frame(param, error, save_plot, d1):
             plt.savefig(save_plot+'.png', dpi=300)
         plt.show()
 
-        if d1==True:
+        if param['1d']:
             fig2 = plt.figure(2, figsize=(35,20))### error plot   [0,2.5,5,7.5,10,12.5,15]
             for val, landscape in enumerate(d_landscape):
                 plt.plot(landscape, z_landscape[val], linewidth=5, label='site '+str(val+1))

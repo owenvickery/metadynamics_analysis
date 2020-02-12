@@ -17,23 +17,51 @@ parser.add_argument('-e', help='end',metavar='10',type=int)
 args = parser.parse_args()
 options = vars(args)
 
-param = functions.parameters(args.input)
+param={'circle_plot':False,'ellipse_plot':False, 'picture':False, '1d':False, 'bulk_outline':False, 'prefix':'fes_', '1d_location':'1d_landscapes', 'invert':1}
+circle = ['circle_area','ring_location']
+ellipse = ['ellipse_width', 'ellipse_height','ellipse_angle','ring_location']
+one_dimension = ['x_points', 'y_points', 'search_width']
+picture = ['picture_file','picture_loc']
 ### working
 if args.f == 'sort':
+    setting = ['HILLS_sorted', 'HILLS'] 
+    param = functions.parameters(args.input, setting, param)
+    functions.check_variable(setting, param)
     os.system("awk \'{print $NF,$0}\' "+param['HILLS']+" | sort -n | cut -f2- -d\' \' > "+param['HILLS_sorted'])
 
 if args.f == 'skip':
+    setting = ['HILLS_sort', 'HILLS', 'HILLS_skip'] 
+    param = functions.parameters(args.input, setting, param)
+    functions.check_variable(setting, param)
     if not os.path.exists(param['HILLS_sorted']):
         os.system("awk \'{print $NF,$0}\' "+param['HILLS']+" | sort -n | cut -f2- -d\' \' > "+param['HILLS_sorted'])
     functions.skip_hills(param['HILLS_sorted'], param['HILLS_skip'])
 
 if args.f == 'plot':
-    functions.final_frame(param, args.error, args.save, args.d1)
+    setting = ['picture', 'bulk_values', 'fes', 'energy_max', 'invert','colour_bar_tick', 'CV1','CV2', 'interval_x', 'interval_y', 'bulk_outline', 
+               'circle_plot','ellipse_plot', '1d', 'step'] 
+    param = functions.parameters(args.input, setting, param)
+    functions.check_variable(setting, param)
+    if param['circle_plot']:
+        param = functions.parameters(args.input, circle, param)
+        functions.check_variable(circle, param)
+    if param['ellipse_plot']:
+        param = functions.parameters(args.input, ellipse, param)
+        functions.check_variable(ellipse, param)
+    if param['1d']:
+        param = functions.parameters(args.input, one_dimension, param)
+        functions.check_variable(one_dimension, param)
+    if param['picture']:
+        param = functions.parameters(args.input, picture, param)
+        functions.check_variable(picture, param)
+    functions.final_frame(param, args.error, args.save)
 
 #### average z across frames
-if args.f== 'concat':
-    if os.path.exists('bulk_values'):
-        coord=np.genfromtxt('bulk_values', autostrip=True)
+if args.f == 'concat':
+    setting = ['bulk_values', 'prefix', 'start', 'end'] 
+    param = functions.parameters(args.input, setting, {})    
+    if os.path.exists(param['bulk_values']):
+        coord=np.genfromtxt(param['bulk_values'], autostrip=True)
         sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l=coord[:,0],coord[:,1],coord[:,2],coord[:,3]
     else:
         x,y,z,e=functions.readfes(param['prefix']+str(param['end'])+'.dat')
@@ -71,6 +99,12 @@ if args.f == 'strip':
             enloc.write(line_outputs+'\n')
 
 if args.f == 'converge':
+    setting = ['bulk_values', 'HILLS_skipped', 'ring_location', 'start', 'end'] 
+    param = functions.parameters(args.input, setting, param) 
+    if param['circle_plot']:
+        param = functions.parameters(args.input, circle, param)
+    if param['ellipse_plot']:
+        param = functions.parameters(args.input, ellipse, param)
     functions.hills_converge(param)
 
 if args.f == 'frames':  ## needs updating
