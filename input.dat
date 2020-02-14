@@ -1,93 +1,90 @@
 # standard inputs
-
-# fes=fes_448.dat
-
-
-
-
 # file names
-HILLS_skip=HILLS_skipped
-HILLS_sort=HILLS_sorted
-HILLS = HILLS
-bulk_values=bulk_values
-fes = fes_bootstrapped-446-448
-prefix = fes_
+HILLS_skip  = HILLS_skipped
+HILLS_sort  = HILLS_sorted
+HILLS       = HILLS
+bulk_values = bulk_values
+fes         = fes_bootstrapped-0-38 # fes_38.dat
+prefix      = fes_
 
 # plot
-invert=1
 CV1 = X (nm)
 CV2 = Y (nm)
 
-colour_bar_tick=1
-minz=-15
-step =2.5
-lim_ux=125
-lim_ly= -30
-label_loc_x=123
-label_loc_y=15
-# bulk_outline = True
-# tick paramters
-interval_x=1
-interval_y=1
-energy_max = 20
+
+# ploting 2D FES
+plot_colour_bar_tick=2.5
+plot_minz=-15
+plot_step =2.5
+plot_energy_max = 0
+plot_interval_x=1
+plot_interval_y=1
+
+# bulk_outline = True # print outline of bulk reference area
 
 # rings in the format X,Y X,Y separated by spaces
-ring_location=0.91976558,-1.75777755 3,3
 # Circle
 # circle_plot=True
 circle_area=0.5,0.5
+circle_centers=1.66,0 3,3
+
 # ellipse
 # ellipse_plot=True
-ellipse_width = 3
-ellipse_height = 2
-ellipse_angle = 45  # in degrees
+ellipse_width = 3, 2
+ellipse_height = 2, 1
+ellipse_angle = 45, 60  # in degrees
+ellipse_centers=1,1 -1,-1
 
 # picture plot
-# picture=True
-picture_file=/sansom/s136/bioc1534/Documents/MD/A2a/metadynamics/extracellular/A2A_hills/picture.tga
-picture_loc=2.7,-3.2, 3.1,-3.1
+picture=True
+picture_file=convergence.png
+picture_loc=-3, 3, -3,3 # left, right, bottom, top
 
 # 1 dimensional search
-# 1d = False
+# 1d = True
 search_width=3
-x_points =  0.0,5  
-y_points =  0,0 
+start_points = 0,0  
+end_points =  0,5 
 1d_location=1d_landscapes
 stride = 0.25
 
 
 ## Concat section
-## needs 'bulk values', though will recreate is not known
+## needs 'bulk values', though will recreate if not known
 ## needs 'prefix' for FES name, default is 'fes_'
 ## needs either circle or ellipses chosen
-start = 446
-end = 448
+start = 0
+end = 38
 
 ## Converge section
 ## needs 'bulk_values', HILLS_skip, start and end
-## optional circle or ellipses chosen along with ring_location
+## optional circle or ellipses to look at hills within areas
+converge_title_height = 0.8
+converge_labels = 35
+converge_x_interval = 2
+
 
 # bootstrap 1D
-min_cv=0,0,0.1,0
-cutoff=2.8, 2.1, 2.8, 2.3
-cut=0.3
-step_yaxis=5
+## needs 1d_location, start, end
+cv_min = 0
+cv_max = 3 # maximum CV 
+ref_max = 2.2
+ref_min = 1.8 # references average energy between cut and cutoff as zero 
+step_yaxis = 5
+step_xaxis = 1
+equilibration=0  # start time
+stride = 0.25 # in microseconds
+boot_label_y = 15     
+boot_labels=35  
+boot_title_height=0.80
+boot_labels_size=35
+boot_energy_max = 20
+boot_step_yaxis = 5
 
-equilibration=0
-lim_ly = -20
-lab_y = 15
-cutoff_max = 0
-cutoff_min = 0       
-labels=35  
-title_height=0.80
-labels_size=35
-stride = 0.25
-
+# plot CV section
 walker_range=0,1
-
-
-
-
-
-
-
+cv_x_interval=2
+cv_y_interval=2
+cv_labels_size=40
+cv_tick_size=30
+cv_title_height=0.85
