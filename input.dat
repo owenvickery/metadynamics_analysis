@@ -4,64 +4,77 @@ HILLS_skip  = HILLS_skipped
 HILLS_sort  = HILLS_sorted
 HILLS       = HILLS
 bulk_values = bulk_values
-fes         = fes_bootstrapped-0-38 # fes_38.dat
+fes         = fes_bootstrapped-252-303 # fes_38.dat
 prefix      = fes_
 
 # plot
 CV1 = X (nm)
 CV2 = Y (nm)
 
-
+#make energy pdb 
+pdb_offset = 6.2, 6.4, 6.3
+pdb_output = fes_pdb.pdb
 # ploting 2D FES
-plot_colour_bar_tick=2.5
-plot_minz=-15
-plot_step =2.5
-plot_energy_max = 0
-plot_interval_x=1
-plot_interval_y=1
+trim = -100,6.3,-100,100  # fes_trim size : x_min, x_max, y_min, y_max 
+plot_trim = -4.2,4.2,-4,4
+#plot_trim = -6.5,6.5,-6.5,6.5 
+bulk_outline_shrink = 1.5  # shrink amount
+bulk_area = 0.5  #  bulk width
+plot_colour_bar_tick = 10  # colour bar tick
+plot_step = 5  # contour lines step  1 kcal = 4.184
+plot_energy_max = 0 #-20 # contour lines max
+plot_energy_min = -70
+plot_interval_x = 2 
+plot_interval_y = 2
 
-# bulk_outline = True # print outline of bulk reference area
+bulk_outline = False # print outline of bulk reference area
 
 # rings in the format X,Y X,Y separated by spaces
 # Circle
-# circle_plot=True
-circle_area=0.5,0.5
-circle_centers=1.66,0 3,3
+circle_plot=True
+#circle_area=0.2,0.2,0.2,0.2
+#circle_centers=0.8,-1.4 -2.1,1.4 0.8,1.65 -0.56,-0.75
+circle_area= 0.5,0.5,0.8,0.5 
+circle_centers= 2.601,1.18 0.228,-1.883  -1.05,-0.1 -2.327,0.34 
 
 # ellipse
-# ellipse_plot=True
-ellipse_width = 3, 2
-ellipse_height = 2, 1
-ellipse_angle = 45, 60  # in degrees
-ellipse_centers=1,1 -1,-1
+ellipse_plot=True
+ellipse_height = 1.5
+ellipse_width = 0.8
+ellipse_angle = -45  # in degrees
+ellipse_centers=1.91,-1.1
 
 # picture plot
 picture=True
-picture_file=convergence.png
-picture_loc=-3, 3, -3,3 # left, right, bottom, top
+picture_file=protein.tga
+picture_loc=-3.45, 3, -2.5, 2.1 # left, right, bottom, top
 
 # 1 dimensional search
-# 1d = True
-search_width=3
-start_points = 0,0  
-end_points =  0,5 
+1d = True
+#search_width=1
+#start_points = -6,-0.1 
+#end_points =  -0,-0.1
 1d_location=1d_landscapes
 stride = 0.25
+
+search_width=1.6
+start_points = 1.5,-5
+end_points =  1.5,5
 
 
 ## Concat section
 ## needs 'bulk values', though will recreate if not known
 ## needs 'prefix' for FES name, default is 'fes_'
 ## needs either circle or ellipses chosen
-start = 0
-end = 38
+start = 252
+end = 303
 
 ## Converge section
 ## needs 'bulk_values', HILLS_skip, start and end
 ## optional circle or ellipses to look at hills within areas
 converge_title_height = 0.8
 converge_labels = 35
-converge_x_interval = 2
+converge_x_interval = 25
 
 
 # bootstrap 1D

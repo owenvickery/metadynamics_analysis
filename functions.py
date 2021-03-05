@@ -335,7 +335,7 @@ def hills_converge(param, show):
         sites = np.genfromtxt('energies_time')
         time_energy=np.arange(0,len(sites[:,0]), 1)*0.25
     start = np.argmax(ave(bulk, 10)<np.max(gau)*0.05)
-    print('Equilibration point where bulk is <5% the maximum gaussian height is: '+str(np.round(ave(time_bulk, 10)[start], 2)))
+    print('Equilibration point where bulk is <5% ('+str(np.round(np.max(gau)*0.05,2))+') the maximum gaussian height is: '+str(np.round(np.max(bulk), 2)))
     plt.figure(1, figsize=(20,30))
 
     plt.subplot(plot_numbers,1,1)
@@ -737,7 +737,7 @@ def get_frames(param):
         if filename.endswith(".xtc"):
             # xtc = re.search('(*.)\.', filename)[0]
             # print(xtc)
-            # xtc = re.search('\.(.*)\.', filename)[1]
+            xtc = re.search('\.(.*)\.', filename)[1]
             xtc_files.append(filename[:-4])
     pool = mp.Pool(mp.cpu_count())
 
@@ -745,10 +745,10 @@ def get_frames(param):
     # pool.join
     
     for val, xtc in enumerate(xtc_files):
-        file_out=np.genfromtxt('../'+xtc+'.xvg', autostrip=True, comments='#!',skip_header=1)
+        file_out=np.genfromtxt('../'+xtc+'.xvg', autostrip=True, comments='@',skip_header=16)
         for ring_num, ring in enumerate(param['circle_centers']):
             loc=np.where(np.sqrt(((float(ring[0])-file_out[:,1])**2)+((float(ring[1])-file_out[:,2])**2)) <= param['circle_area'][ring_num])
-            time_loc=file_out[:,0][loc]*200000
+            time_loc=file_out[:,0][loc]
             start_time = time.time()
 
             test = pool.map_async(gromacs, ['echo 0 | gmx trjconv -pbc res -f ../*'+xtc+'.xtc -s ../*tpr -b '+str(time_stamp)+' -e '+str(time_stamp)+' -o ring_'+str(ring_num+1)+'_'+xtc+'_'+str(int(time_stamp))+'_ind.xtc' for time_stamp in time_loc]).get()
