@@ -16,7 +16,7 @@ class TestSum(unittest.TestCase):
     def test_find_min(self):
         e1 = 10.1
         result = functions.find_min(e1)
-        self.assertEqual(result, -15)
+        self.assertEqual(result, 10)
 
 
 
