@@ -2,9 +2,9 @@
 # file names
 HILLS_skip  = HILLS_skipped
 HILLS_sort  = HILLS_sorted
-HILLS       = HILLS
+HILLS       = HILLS         
 bulk_values = bulk_values
-fes         = fes_bootstrapped-252-303 # fes_38.dat
+fes         = fes.dat # fes_38.dat
 prefix      = fes_
 
 # plot
@@ -14,7 +14,8 @@ CV2 = Y (nm)
 #make energy pdb 
 pdb_offset = 6.2, 6.4, 6.3
 pdb_output = fes_pdb.pdb
-# ploting 2D FES
+
+# plotting 2D FES
 trim = -100,6.3,-100,100  # fes_trim size : x_min, x_max, y_min, y_max 
 plot_trim = -4.2,4.2,-4,4
 #plot_trim = -6.5,6.5,-6.5,6.5 
@@ -75,7 +76,7 @@ end = 303
 converge_title_height = 0.8
 converge_labels = 35
 converge_x_interval = 25
-
+hills_trim = True     # trims around bulk area to remove artifacts froms the walls
 
 # bootstrap 1D
 ## needs 1d_location, start, end

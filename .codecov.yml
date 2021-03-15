@@ -1,0 +1,9 @@
+codecov:
+  token: 2e662c58-44a4-448d-a652-6123e0dce7fe
+
+coverage:
+  precision: 2
+  round: down
+  range: "0...100"
+  status:
+    patch: off

@@ -1,0 +1,1 @@
+ln -fs $CONDA_PREFIX/pkgs/$PKG_NAME-$PKG_VERSION-$PKG_BUILDNUM/info/recipe/metadynamics.py $CONDA_PREFIX/bin/metaanalysis ||  echo "ln -fs $CONDA_PREFIX/pkgs/$PKG_NAME/info/recipe/metadynamics.py $CONDA_PREFIX/bin/metaanalysis  wrong" > $PREFIX/.messages

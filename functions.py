@@ -21,7 +21,7 @@ import re
 from scipy import stats
 from numba import jit
 from scipy.spatial import cKDTree
-
+from scipy.interpolate import UnivariateSpline
 
 # Fonts
 
@@ -67,33 +67,40 @@ cmaps = [('Perceptually Uniform Sequential', [
 
 
 def parameters(input_file, setting, param):
-    if os.path.exists(input_file):
-        with open(input_file, 'r') as param_input:
-            for line_nr, line in enumerate(param_input.readlines()):
-                if not line.startswith('#'):
-                    line_sep = line.split('#')[0].split('=') 
-                    variable = line_sep[0].strip()
-                    if variable in setting:
-                        param[variable] = split_setting(variable, line_sep[-1])
-    else:
-        sys.exit('cannot find parameter file')
+    if input_file != None:
+        if os.path.exists(input_file):
+            with open(input_file, 'r') as param_input:
+                for line_nr, line in enumerate(param_input.readlines()):
+                    if not line.startswith('#'):
+                        line_sep = line.split('#')[0].split('=') 
+                        variable = line_sep[0].strip()
+                        if variable in setting:
+                            param[variable] = split_setting(variable, line_sep[-1])
+        else:
+            sys.exit('cannot find parameter file')
     return param
 
 def check_variable(setting, param):
+    missing_variables = []
     for var in setting:
         if var not in param:
-            sys.exit('The variable '+var+' is missing')
+            missing_variables.append(var)
+    if len(missing_variables) > 0:
+        print('The following variables are missing from the input file:\n')
+        for variable in missing_variables:
+            print(variable)
+        sys.exit('\n')
 
 
 def split_setting(variable, setting):
     string_variables = ['pdb_output', 'fes', 'picture_file', 'bulk_values', 'CV1', 'CV2', 'prefix', '1d_location', 'HILLS_skip', 'HILLS_sort', 'HILLS']
-    int_variables = ['start', 'end']
-    float_variables = ['plot_step','plot_labels', 'plot_interval_x', 'plot_interval_y','plot_energy_min', 'plot_energy_max', 
+    int_variables = ['frame_start', 'frame_end', 'invert_x', 'invert_y']
+    float_variables = ['plot_energy_step', 'plot_error_step', 'plot_labels', 'plot_interval_x', 'plot_interval_y','plot_energy_min', 'plot_energy_max', 
                         'plot_colour_bar_tick', 'cv_x_interval', 'cv_y_interval', 'cv_labels_size', 
                         'cv_title_height', 'cv_tick_size', 'boot_label_y','boot_labels', 'boot_title_height',
                         'boot_labels_size', 'boot_energy_max', 'boot_step_yaxis',   'converge_labels', 
                         'converge_title_height', 'converge_x_interval', 'equilibration', 'stride','step_xaxis',
-                        'step_yaxis', 'bulk_outline_shrink', 'bulk_area']
+                        'step_yaxis', 'bulk_outline_shrink', 'bulk_area', 'plot_error_max', 'plot_error_min']
     complex_variables = ['start_points', 'end_points', 'circle_centers','ellipse_centers']
     list_variables = ['picture_loc', 'cv_min', 'cv_max', 'circle_area', 'ellipse_height', 'ellipse_width', 'ellipse_angle','ref_min', 
                       'ref_max', 'walker_range', 'search_width', 'trim', 'plot_trim', 'pdb_offset']
@@ -163,7 +170,7 @@ def read_bulk(files,time, dx, dy,gau):
     bulk=bulk[time_bulk_index]      
     return time_bulk, bulk
 
-def readhills(files):
+def readhills(files, param):
     time, dx, dy, gau=[],[],[],[]
     wtime, wdx, wdy, wgau, tstamp= [],[],[],[],[]
     count=0
@@ -173,8 +180,8 @@ def readhills(files):
             if not line[0] in ['#', '@']:
                     count+=1
                     time.append(float(count)/1000)
-                    dx.append(float(line.split()[1]))
-                    dy.append(float(line.split()[2]))
+                    dx.append(float(line.split()[1])*param['invert_x'])
+                    dy.append(float(line.split()[2])*param['invert_y'])
                     gau.append(float(line.split()[5]))
     return np.array(time),np.array(dx),np.array(dy),np.array(gau)
 
@@ -201,16 +208,24 @@ def readfes(files, param):
     start_fes=time.time()
     cut = []
     for line in open(files, 'r').readlines():
-            if not line[0] in ['#', '@'] and len(line)>1:
-                try:
-                    line_sep = line.split()
-                    if param['trim'][0] < float(line_sep[0]) < param['trim'][1] and param['trim'][2] < float(line_sep[1]) < param['trim'][3]:
-                        x.append(float(line_sep[0]))
-                        y.append(float(line_sep[1]))
+        if len(line) > 1:
+            if not line[0] in ['#', '@']:
+                line_sep = line.split()
+                if len(line_sep) > 3:
+                    if param['trim'].any():  
+                        if param['trim'][0] < float(line_sep[0])*param['invert_x'] < param['trim'][1]: 
+                            if param['trim'][2] < float(line_sep[1])*param['invert_y'] < param['trim'][3]:
+                                x.append(float(line_sep[0])*param['invert_x'])
+                                y.append(float(line_sep[1])*param['invert_y'])
+                                z.append(float(line_sep[2]))
+                                e.append(float(line_sep[3]))
+                    else:
+                        x.append(float(line_sep[0])*param['invert_x'])
+                        y.append(float(line_sep[1])*param['invert_y'])
                         z.append(float(line_sep[2]))
                         e.append(float(line_sep[3]))
-                except:
-                    print('error in :', line)
+                else:
+                    print('error in :', files, line)
     print('reading in '+files.split('.')[0]+' took:', np.round(time.time() - start_fes, 2))
     return np.array(x),np.array(y),np.array(z),np.array(e)
 
@@ -230,59 +245,87 @@ def clockwiseangle_and_distance(point):
         return 2*math.pi+angle, lenvector
     return angle, lenvector
 
+
+def get_contour_verts(cn):
+    contours = []
+    # for each contour line
+    for cc in cn.collections:
+        paths = []
+        # for each separate section of the contour line
+        for pp in cc.get_paths():
+            xy = []
+            # for each segment of that section
+            for vv in pp.iter_segments():
+                xy.append(vv[0])
+            paths.append(np.vstack(xy))
+        contours.append(paths)
+
+    return contours
+
+def cont_strip(contour_set):
+    x, y=np.array([]), np.array([])
+    for i in contour_set:
+        x = np.append(x, i[:,0])
+        y = np.append(y, i[:,1])
+    return x, y
+
 def bulk_val(x,y,z, param): 
-        bulk =[]
-        shuffledxy=[]
-        bulk_x,bulk_y=np.array([]),np.array([])
-        bulk_ring = np.where(np.logical_and(-0.002< z, z < 0))
-        bulk_x, bulk_y=x[bulk_ring], y[bulk_ring]
-        shuffledxy = np.stack((x,y), axis=-1)
-        # print('done outline')
-        centered=[]
-        bulk_x_new,bulk_y_new=bulk_x, bulk_y
-        for i in range(len(bulk_x)):
-                x_ind, y_ind= bulk_x[i], bulk_y[i]
-                center=np.where(np.sqrt(((x_ind-bulk_x_new)**2)+((y_ind-bulk_y_new)**2)) < 0.1)
-                to_del=np.where(np.sqrt(((x_ind-bulk_x_new)**2)+((y_ind-bulk_y_new)**2)) < 0.2)
-                if len(center[0])> 0 :
-                    centered.append([np.mean(bulk_x_new[center]),np.mean(bulk_y_new[center])])              
-                    bulk_x_new = np.delete(bulk_x_new,to_del)
-                    bulk_y_new = np.delete(bulk_y_new,to_del)
-        sorted_coord=sorted(centered, key=clockwiseangle_and_distance)
-        run=False
-        for i in range(1, len(sorted_coord)): 
-            if np.sqrt(((sorted_coord[i-1][0]-0)**2)+((sorted_coord[i-1][1]-0)**2)) > 2 and not run:
-                run=True
-                sorted_x, sorted_y = [sorted_coord[i-1][0]], [sorted_coord[i-1][1]]
-            if run:
-                if np.sqrt(((sorted_coord[i][0]-sorted_x[-1])**2)+((sorted_coord[i][1]-sorted_y[-1])**2)) < 0.5 and run:
-                    sorted_x.append(sorted_coord[i][0])
-                    sorted_y.append(sorted_coord[i][1])
-        sorted_x.append(sorted_x[0])
-        sorted_y.append(sorted_y[0])
+    X,Y,Z,E = reshape_fes(x,y,z,z, param)
+    cn = plt.contour(X, Y, Z, np.arange(5,np.nanmax(Z), 2), alpha=0.5)#np.array([0,5]))
+    # cbar = plt.colorbar(cn)#.set_alpha(1)
+    cont = get_contour_verts(cn)
+    plt.close()
+    # plt.clear()
+    x_all, y_all = [],[]
+    for i_val, i in enumerate(cont):
+        x, y = cont_strip(i)
+        if len(x) > 0:
+            x_all = np.append(x_all,x)
+            y_all = np.append(y_all,y)
 
+    shuffledxy = np.stack((x_all,y_all), axis=-1)
 
-    #### gives line around outside
-        xy=np.stack((sorted_x,sorted_y), axis=-1)
-        sorted_X_l,sorted_Y_l,sorted_X_s, sorted_Y_s  = np.array([]),np.array([]),np.array([]),np.array([])
-        for coord in xy:
-            s=1
-            l=0
-            while l <= param['bulk_outline_shrink']:   ### max distance from outer line 
-                s-=0.01
-                coords=[np.round(coord[0]*s, 3),np.round(coord[1]*s, 3)]
-                l = np.sqrt(((coord[0]-coords[0])**2)+((coord[1]-coords[1])**2))
-                if l <= param['bulk_outline_shrink']-param['bulk_area']:   ### min distance form outer line 
-                    low_coords=coords
-            sorted_X_l = np.append(sorted_X_l, coords[0])
-            sorted_Y_l = np.append(sorted_Y_l, coords[1])
-            sorted_X_s = np.append(sorted_X_s, low_coords[0])
-            sorted_Y_s = np.append(sorted_Y_s, low_coords[1])
-        with open('bulk_values', 'w') as bulk_values:
-            for i in range(len(sorted_X_l)):
-                bulk_values.write(str(sorted_X_s[i])+'\t'+str(sorted_Y_s[i])+'\t'+str(sorted_X_l[i])+'\t'+str(sorted_Y_l[i])+'\n')
-        bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = find_bulk(x,y,z,shuffledxy,sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l)
-        return bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l
+    sorted_coord=sorted(np.array(shuffledxy), key=clockwiseangle_and_distance)
+    sorted_x, sorted_y = separate_contours(sorted_coord)
+
+#### gives line around outside
+    xy=np.stack((ave(sorted_x, 50)[::10],ave(sorted_y, 50)[::10]), axis=-1)
+    sorted_X_l,sorted_Y_l,sorted_X_s, sorted_Y_s  = np.array([]),np.array([]),np.array([]),np.array([])
+    for coord in xy:
+        coords = shrink_bulk_outline(coord, param['bulk_outline_shrink'])
+        low_coords = shrink_bulk_outline(coords, param['bulk_area'])
+        sorted_X_l = np.append(sorted_X_l, coords[0])
+        sorted_Y_l = np.append(sorted_Y_l, coords[1])
+        sorted_X_s = np.append(sorted_X_s, low_coords[0])
+        sorted_Y_s = np.append(sorted_Y_s, low_coords[1])
+    with open('bulk_values', 'w') as bulk_values:
+        for i in range(len(sorted_X_l)):
+            bulk_values.write(str(sorted_X_s[i])+'\t'+str(sorted_Y_s[i])+'\t'+str(sorted_X_l[i])+'\t'+str(sorted_Y_l[i])+'\n')
+    bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = find_bulk(x,y,z,np.stack((x,y), axis=-1),sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l)
+    return bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l
+
+def separate_contours(sorted_coord):
+    run=False
+    for i in range(1, len(sorted_coord)): 
+        if np.sqrt(((sorted_coord[i-1][0]-0)**2)+((sorted_coord[i-1][1]-0)**2)) > 2 and not run:
+            run=True
+            sorted_x, sorted_y = [sorted_coord[i-1][0]], [sorted_coord[i-1][1]]
+        if run:
+            if np.sqrt(((sorted_coord[i][0]-sorted_x[-1])**2)+((sorted_coord[i][1]-sorted_y[-1])**2)) < 0.5 and run:
+                sorted_x.append(sorted_coord[i][0])
+                sorted_y.append(sorted_coord[i][1])
+    sorted_x.append(sorted_x[0])
+    sorted_y.append(sorted_y[0])
+    return sorted_x, sorted_y
+
+def shrink_bulk_outline(coord, shrink):
+    s=1
+    l=0
+    while l <= shrink:   ### max distance from outer line 
+        s-=0.01
+        shrunk_coords=[np.round(coord[0]*s, 3),np.round(coord[1]*s, 3)]
+        l = np.sqrt(((coord[0]-shrunk_coords[0])**2)+((coord[1]-shrunk_coords[1])**2))
+    return shrunk_coords
 
 
 def find_bulk(x,y,z,shuffledxy, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l):
@@ -316,7 +359,7 @@ def trim_hills(files, time, dx, dy, gau):
 
 def hills_converge(param, show):
     lab=[]
-    time, dx, dy, gau = readhills(param['HILLS_skip'])
+    time, dx, dy, gau = readhills(param['HILLS_skip'], param)
     if param['hills_trim']:
         time, dx, dy, gau = trim_hills(param['bulk_values'],time, dx, dy,gau)
     time_bulk ,bulk = read_bulk(param['bulk_values'],time, dx, dy,gau)
@@ -329,12 +372,13 @@ def hills_converge(param, show):
     if param['ellipse_plot']:
         plot_numbers+=len(param['ellipse_centers'])
         plt.figure(1, figsize=(20,30))        
-
     lim_ux=max(time)+2
+    param['converge_x_interval'] = int(lim_ux/10) if not param['converge_x_interval'] else param['converge_x_interval']
+    param['converge_y_interval'] = np.round((max(gau)/3), 1) if not param['converge_y_interval'] else param['converge_y_interval']
     if os.path.exists('energies_time'):
         sites = np.genfromtxt('energies_time')
         time_energy=np.arange(0,len(sites[:,0]), 1)*0.25
-    start = np.argmax(ave(bulk, 10)<np.max(gau)*0.05)
+    start = np.argmax(ave(bulk, 10)<np.max(gau)*0.05) if len(bulk) > 0 else 0
     print('Equilibration point where bulk is <5% ('+str(np.round(np.max(gau)*0.05,2))+') the maximum gaussian height is: '+str(np.round(np.max(bulk), 2)))
     plt.figure(1, figsize=(20,30))
 
@@ -343,9 +387,9 @@ def hills_converge(param, show):
     # plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
     plt.plot(time,gau, color='blue',linewidth=4)
     plt.plot(ave(time, 10), ave(gau, 10), color='red',linewidth=4)
-    plt.yticks(np.arange(0, 1.3,0.4), fontproperties=font1,  fontsize=30)#
-    plt.xticks(np.arange(0, lim_ux,param['converge_x_interval']), fontproperties=font1,  fontsize=30)#
-    plt.ylim(-0.1,1.2);plt.xlim(-2, lim_ux)
+    plt.yticks(np.arange(0, max(gau)*1.1,param['converge_y_interval']), fontproperties=font1,  fontsize=30)#
+    plt.xticks(np.arange(0, lim_ux, param['converge_x_interval']), fontproperties=font1,  fontsize=30)#
+    plt.ylim(-0.1,max(gau)*1.1);plt.xlim(-2, lim_ux)
     plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=35, direction='in', pad=10, right=False, top=False,labelbottom=False)
     plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=param['converge_labels'])
 
@@ -354,9 +398,9 @@ def hills_converge(param, show):
     plt.axvline(ave(time_bulk, 10)[start],ymin=0, ymax=0.70, linewidth=8,color='k')
     plt.plot(time_bulk ,bulk, color='blue',linewidth=4)
     plt.plot(ave(time_bulk, 10), ave(bulk, 10), color='red',linewidth=4)
-    plt.yticks(np.arange(0, 1.3,0.4), fontproperties=font1,  fontsize=30)#
+    plt.yticks(np.arange(0, max(gau)*1.1,param['converge_y_interval']), fontproperties=font1,  fontsize=30)#
     plt.xticks(np.arange(0, lim_ux,param['converge_x_interval']), fontproperties=font1,  fontsize=30)#
-    plt.ylim(-0.1,1.2);plt.xlim(-2, lim_ux)
+    plt.ylim(-0.1,max(gau)*1.1);plt.xlim(-2, lim_ux)
     
     plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=param['converge_labels']) 
     if plot_numbers == 2:
@@ -390,9 +434,9 @@ def plot_converge_sites(plot_numbers, fig_num, time_bulk, start, time, gau, cent
     plt.title('Site '+str(fig_num-2) ,  fontproperties=font1, fontsize=40,y=param['converge_title_height'])#+' gaussian height'
     plt.scatter(time[center],gau[center], s=100, color='blue')
     plt.scatter(ave(time[center], 10), ave(gau[center], 10), s=25, alpha=0.3, color='red')
-    plt.yticks(np.arange(0, 1.21,0.4), fontproperties=font1,  fontsize=30)
+    plt.yticks(np.arange(0, max(gau)*1.1, param['converge_y_interval']), fontproperties=font1,  fontsize=30)#
     plt.xticks(np.arange(0, lim_ux,param['converge_x_interval']), fontproperties=font1,  fontsize=30)#
-    plt.ylim(-0.1,1.2);plt.xlim(-2, lim_ux)
+    plt.ylim(-0.1,max(gau)*1.1);plt.xlim(-2, lim_ux)
     plt.ylabel('Hills height \n(kJ mol$^{-1}$)', fontproperties=font2,fontsize=param['converge_labels']) 
     if fig_num != plot_numbers:
         plt.tick_params(axis='both', which='major', width=3, length=15, labelsize=35, direction='in', pad=10, right=False, top=False,labelbottom=False)
@@ -418,33 +462,35 @@ def find_min(floatz):
         minz-=5
     return minz
 
-def write_pdb(pdb_file, z, dict):
+def write_pdb(pdb_file, z, xy_coord):
     pdbline = "ATOM  %5d %4s %4s%1s%4d    %8.3f%8.3f%8.3f%6.2f%6.2f"
     box_line="CRYST1 %8.3f %8.3f %8.3f  90.00  90.00  90.00 P 1           1\n"
     with open(pdb_file, 'w') as pdb:
         at_count=0
-        for x in dict:
-            for y in dict[x]:
+        for x in xy_coord:
+            for y in xy_coord[x]:
                 at_count+=1
-                pdb.write(pdbline%((at_count, 'dg', 'head',' ',1,float(x), float(y), z, 1, dict[x][y]))+'\n')
+                pdb.write(pdbline%((at_count, 'dg', 'head',' ',1,float(x), float(y), z, xy_coord[x][y]['error'], xy_coord[x][y]['energy']))+'\n')
 
 def simple_fes(fes, param):
-    dict0 = {}
+    energy = {}
     for position in fes:
         if position[2] < 5:
-            x = (position[0]*-1+param['pdb_offset'][0])*10
-            y = (position[1]*-1+param['pdb_offset'][1])*10
+            x = (position[0]+param['pdb_offset'][0])*10
+            y = (position[1]+param['pdb_offset'][1])*10
             x = np.round(x * 2) / 2
             y = np.round(y * 2) / 2
-            if str(x) not in dict0:
-                dict0[str(x)]={str(y):[]}
-            if str(y) not in dict0[str(x)]:
-                dict0[str(x)][str(y)] = []
-            dict0[str(x)][str(y)].append(position[2])
-    return dict0
+            if str(x) not in energy:
+                energy[str(x)]={}
+            if str(y) not in energy[str(x)]:
+                energy[str(x)][str(y)] = {'energy':[], 'error':[]}
+            energy[str(x)][str(y)]['energy'].append(position[2])
+            energy[str(x)][str(y)]['error'].append(position[3])
+    return energy
 
-def trim_fes(x_list,y_list, z_list, param):
-    fes_complete = np.stack((x_list,y_list, z_list), axis=-1)
+def trim_fes(x_list,y_list, z_list, e_list, param):
+    print('triming fes')
+    fes_complete = np.stack((x_list,y_list, z_list, e_list), axis=-1)
     fes_cut_x = fes_complete[np.logical_and(param['plot_trim'][0] < fes_complete[:,0],fes_complete[:,0] < param['plot_trim'][1])]
     fes_cut_y = fes_cut_x[np.logical_and(param['plot_trim'][0] < fes_cut_x[:,1],fes_cut_x[:,1] < param['plot_trim'][1])]
     return fes_cut_y 
@@ -455,8 +501,13 @@ def average_simple_fes(sim_fes):
         for y in sim_fes[x]:
             if x not in dict_mean:
                 dict_mean[x] = {}
-            if len(sim_fes[x][y]) > 0:
-                dict_mean[x][y] = np.mean(sim_fes[x][y]) 
+            if len(sim_fes[x][y]['energy']) > 0:
+                dict_mean[x][y] = {}
+                dict_mean[x][y]['energy'] = np.mean(sim_fes[x][y]['energy']) 
+                if len(sim_fes[x][y]['error']) > 0:
+                    dict_mean[x][y]['error'] = np.mean(sim_fes[x][y]['error'])
+                else:
+                    dict_mean[x][y]['error'] = 0
     return dict_mean
 
 def plot_pdb(param):
@@ -464,14 +515,16 @@ def plot_pdb(param):
     x_list,y_list,z_list,e_list=readfes(param['fes'], param)    ### reads in energy landscape
     print('finding bulk')
     z_list, bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = get_bulk(x_list,y_list,z_list, param)
-    print('triming fes')
-    fes_cut = trim_fes(x_list,y_list, z_list, param)
+    if any(param['plot_trim']):
+        fes = trim_fes(x_list,y_list, z_list, e_list, param)
+    else:
+        fes = np.stack((x_list,y_list, z_list, e_list), axis=-1)
     print('simple fes out')
-    simple_fes_dict=simple_fes(fes_cut, param)    ### reads in energy landscape
+    simple_fes_dict=simple_fes(fes, param)    ### reads in energy landscape
     mean_simple_fes_dict = average_simple_fes(simple_fes_dict)
     write_pdb(param['pdb_output'], param['pdb_offset'][2]*10,  mean_simple_fes_dict)
 
-def reshape_fes(x,y,z,e):
+def reshape_fes(x,y,z,e, param):
     ###  reshapes x & y to be plotted in 2D 
     count=0
     ini = 0
@@ -497,10 +550,15 @@ def reshape_fes(x,y,z,e):
 
     Z = z.reshape(int(len(x)/count),count)
     E = e.reshape(int(len(x)/count),count)
-    X = np.arange(np.min(x), np.max(x),  (np.sqrt((np.min(x)- np.max(x))**2))/count)# 0.00353453608)#
-    Y = np.arange(np.amin(y), np.amax(y), (np.sqrt((np.min(y)- np.max(y))**2))/(len(x)/count))
+    if param['invert_x'] == 1:
+        X = np.arange(np.min(x), np.max(x),  (np.sqrt((np.min(x)- np.max(x))**2))/count)
+    else:
+        X = np.arange(np.max(x), np.min(x),  -(np.sqrt((np.min(x)- np.max(x))**2))/count)
+    if param['invert_y'] == 1:
+        Y = np.arange(np.amin(y), np.amax(y), (np.sqrt((np.min(y)- np.max(y))**2))/(len(x)/count))#param['invert_y']
+    else:
+        Y = np.arange(np.amax(y), np.amin(y), -(np.sqrt((np.min(y)- np.max(y))**2))/(len(x)/count))#param['invert_y']
     X, Y = np.meshgrid(X, Y)
-
     return X,Y,Z,E
 
 def get_bulk(x,y,z, param):
@@ -523,36 +581,100 @@ def get_bulk(x,y,z, param):
 def final_frame(param, error, show):
 ### intialisation
     start_plot=time.time()
-    if not error:
-        fig1 = plt.figure(1, figsize=(35,20))
-        ax1 = fig1.add_subplot(111)#, aspect='equal')
-    ### add picture
-        if param['picture']:   ### background picture
-            im1 = plt.imread(param['picture_file'])
-            implot1 = plt.imshow(im1,aspect='equal', extent=(param['picture_loc'][0],param['picture_loc'][1],param['picture_loc'][2],param['picture_loc'][3]), alpha=1)
-    ### read in fes
-        x,y,z,e=readfes(param['fes'], param)    ### reads in energy landscape
-        z, bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = get_bulk(x,y,z, param)
-        X,Y,Z,E = reshape_fes(x,y,z,e)
 
-        ### allows manually defined maxz and minz
-        maxz=np.nanmax(Z) if 'plot_energy_max' not in param else param['plot_energy_max']
-        minz=find_min(np.nanmin(Z)) if 'plot_energy_min' not in param else param['plot_energy_min']
-        contour = np.array(np.arange(minz, maxz+0.1, param['plot_step']))
-    ### FES shading and contours
-        cax = ax1.contourf(X,Y,Z,np.arange(np.round(minz,0), param['plot_energy_max']+0.1, param['plot_step']), cmap=plt.get_cmap('coolwarm_r'),norm=MidpointNormalize(midpoint=0.), alpha=0.5, vmin = minz, vmax = maxz )# , alpha=0.25)
-        con = ax1.contour(X,Y,Z,contour, linewidths=4, cmap=plt.get_cmap('coolwarm_r'), linestyles='-',norm=MidpointNormalize(midpoint=0.), alpha=1, vmin = minz, vmax = maxz )#, alpha=1)#colors='k'# cax = ax1.contourf(X,Y,Z,np.arange(-100, 15, 5), cmap=cm.coolwarm, vmin = minz, vmax = 15 , alpha=1)
+### read in fes
+    print('reading in FES: ', param['fes'])
+    x,y,z,e=readfes(param['fes'], param)    ### reads in energy landscape
+    z, bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = get_bulk(x,y,z, param)
+    X,Y,Z,E = reshape_fes(x,y,z,e, param)
+    plt.close()
+    # plt.clear()    
+    fig1 = plt.figure(1, figsize=(30,20))
+    ax1 = fig1.add_subplot(111, aspect='equal')
+### add picture
+    if param['picture']:   ### background picture
+        im1 = plt.imread(param['picture_file'])
+        implot1 = plt.imshow(im1,aspect='equal', extent=(param['picture_loc'][0],param['picture_loc'][1],param['picture_loc'][2],param['picture_loc'][3]), alpha=1)
+    ### allows manually defined maxz and minz
+    maxz=np.nanmax(Z) if not param['plot_energy_max'] else param['plot_energy_max']
+    minz=find_min(np.nanmin(Z)) if not param['plot_energy_min'] else param['plot_energy_min']
+    contour_lines = np.array(np.arange(minz, maxz+0.1, param['plot_energy_step']))
+### FES shading and contours
+    cax = ax1.contourf(X,Y,Z,contour_lines, cmap=plt.get_cmap('coolwarm_r'),norm=MidpointNormalize(midpoint=0.), alpha=0.5, vmin = minz, vmax = maxz )# , alpha=0.25)
+    con = ax1.contour( X,Y,Z,contour_lines, linewidths=4, cmap=plt.get_cmap('coolwarm_r'), linestyles='-',norm=MidpointNormalize(midpoint=0.), alpha=1, vmin = minz, vmax = maxz )#, alpha=1)#colors='k'# cax = ax1.contourf(X,Y,Z,np.arange(-100, 15, 5), cmap=cm.coolwarm, vmin = minz, vmax = 15 , alpha=1)
 
-    ### colourbar   np.arange(np.round(minz,-1), maxz+1, step*2))
-        cbar = fig1.colorbar(cax, ticks=np.arange(np.round(minz,0), param['plot_energy_max']+0.1, param['plot_colour_bar_tick']))#.set_alpha(1)
-        ticklabs = cbar.ax.get_yticklabels()
-        cbar.ax.set_yticklabels(ticklabs, ha='right', va='center', fontsize=60)
-        cbar.set_label('Free energy (kJ mol$^{-1}$)',fontsize=60, labelpad=40)
-        cbar.ax.yaxis.set_tick_params(pad=200)
-        cbar.set_alpha(1)
-        cbar.draw_all()
-        text_params = {'ha': 'center', 'va': 'center', 'family': 'sans-serif','fontweight': 'bold'}
+### colourbar   np.arange(np.round(minz,-1), maxz+1, step*2))
+    cbar = fig1.colorbar(cax, ticks=np.arange(np.round(minz,0), maxz+0.1, param['plot_colour_bar_tick']))#.set_alpha(1)
+    ticklabs = cbar.ax.get_yticklabels()
+    cbar.ax.set_yticklabels(ticklabs, ha='right', va='center', fontsize=60)
+    cbar.set_label('Free energy (kJ mol$^{-1}$)',fontsize=60, labelpad=40)
+    cbar.ax.yaxis.set_tick_params(pad=200)
+    cbar.set_alpha(1)
+    cbar.draw_all()
+    text_params = {'ha': 'center', 'va': 'center', 'family': 'sans-serif','fontweight': 'bold'}
 
+### FES highlights circle or ellipse
+    if param['circle_plot']:
+        for val, ring in enumerate(param['circle_centers']):
+            circle = plt.Circle((ring[0],ring[1]), param['circle_area'][val],linewidth=10,edgecolor='k',facecolor='none', zorder=2)
+            ax1.add_artist(circle)
+    if param['ellipse_plot']:
+        for val, ring in enumerate(param['ellipse_centers']):
+            ellipse = patches.Ellipse(xy=(ring[0],ring[1]), width=param['ellipse_width'][val], height=param['ellipse_height'][val], angle=param['ellipse_angle'][val],linewidth=10,edgecolor='k',facecolor='none', zorder=2) # original
+            ax1.add_artist(ellipse)
+### Tick parameters
+    ax1.set_xlabel(param['CV1'], fontproperties=font1,  fontsize=80);ax1.set_ylabel(param['CV2'], fontproperties=font1,  fontsize=80)
+    plt.xticks(np.arange(-180, 180.1,param['plot_interval_x']), fontproperties=font1,  fontsize=80)
+    plt.yticks(np.arange(-180, 180.1,param['plot_interval_y']), fontproperties=font1,  fontsize=80)#
+    ax1.tick_params(axis='both', which='major', width=3, length=5, labelsize=80, direction='out', pad=10)
+### plot bulk area in dotted lines
+    if param['bulk_outline']:
+        plt.plot(sorted_X_l, sorted_Y_l, color='k', linestyle='--', linewidth=6)
+        plt.plot(sorted_X_s, sorted_Y_s, color='k', linestyle='--', linewidth=6)
+### 1D stuff bars
+    if param['1d']:
+        d_landscape, x_landscape, y_landscape, z_landscape =[],[],[],[]
+        for line in range(len(param['start_points'])):
+            distance,d1x,d1y,d1z,point_lower_x,point_lower_y,point_upper_x,point_upper_y=strip_1d(x,y,z, param['start_points'][line], param['end_points'][line], param['search_width'][line])
+            plt.plot([point_lower_x[0],point_lower_x[-1]],[point_lower_y[0],point_lower_y[-1]], color='red',linewidth=10, zorder=2)
+            plt.plot([point_upper_x[0],point_upper_x[-1]],[point_upper_y[0],point_upper_y[-1]], color='red',linewidth=10, zorder=2)
+            plt.plot(d1x,d1y, color='k',linewidth=10, zorder=2)
+            d_landscape.append(distance)
+            x_landscape.append(d1x)
+            y_landscape.append(d1y)
+            z_landscape.append(d1z)
+            # if save_plot != None:
+            write_file(distance,d1x,d1y,d1z, line+1)
+### plot limits
+    
+    if param['plot_trim'].any():
+        plt.xlim(param['plot_trim'][0], param['plot_trim'][1])
+        plt.ylim(param['plot_trim'][2], param['plot_trim'][3])
+    else:
+        plt.xlim(min(x)-0.1 ,max(x)+0.1)
+        plt.ylim(min(y)-0.1,max(y)+0.1)
+
+    plt.subplots_adjust(top=0.972, bottom=0.13,left=0.168,right=0.84, hspace=0.2, wspace=0.2)
+    plt.savefig(param['fes'].replace('.dat','')+'.png', dpi=300)
+    if param['1d']:
+        fig2 = plt.figure(2, figsize=(35,20))### error plot   [0,2.5,5,7.5,10,12.5,15]
+        for val, landscape in enumerate(d_landscape):
+            plt.plot(landscape, z_landscape[val], linewidth=5, label='site '+str(val+1))
+        plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=15, direction='in', pad=10, right=False, top=False)
+        plt.xlabel('Distance (nm)', fontproperties=font2,fontsize=15);plt.ylabel('Energy (kJ mol$^{-1}$)', fontproperties=font2,fontsize=15) 
+        plt.legend(prop={'size': 10}, bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=len(d_landscape), mode="expand", borderaxespad=0.)
+    if param['1d']:
+        plt.savefig(param['fes'].replace('.dat','')+'_1D.png', dpi=300)
+    else:
+        plt.savefig(param['fes'].replace('.dat','')+'.png', dpi=300)
+    if show:
+        plt.show()
+    plt.close()
+    return X,Y,Z,E, [sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l]
+
+def plot_error(X,Y,Z,E, bulk, param, show):
+        fig1 = plt.figure(1, figsize=(30,20))### 
+        ax1 = fig1.add_subplot(111, aspect='equal')
     ### FES highlights circle or ellipse
         if param['circle_plot']:
             for val, ring in enumerate(param['circle_centers']):
@@ -562,127 +684,43 @@ def final_frame(param, error, show):
             for val, ring in enumerate(param['ellipse_centers']):
                 ellipse = patches.Ellipse(xy=(ring[0],ring[1]), width=param['ellipse_width'][val], height=param['ellipse_height'][val], angle=param['ellipse_angle'][val],linewidth=10,edgecolor='k',facecolor='none', zorder=2) # original
                 ax1.add_artist(ellipse)
+
+        maxz=np.nanmax(E) if not param['plot_error_max'] else param['plot_error_max']
+        minz=0 if not param['plot_error_min'] else param['plot_error_min']
+        contour_lines = np.array(np.arange(minz, maxz+param['plot_error_step'], param['plot_error_step']))
+    ### FES shading and contours
+        cax = ax1.contourf(X,Y,E,contour_lines, cmap=plt.get_cmap('coolwarm_r'),norm=MidpointNormalize(midpoint=0.), alpha=0.5, vmin = minz, vmax = maxz )# , alpha=0.25)
+        con = ax1.contour(X,Y,E,contour_lines, linewidths=4, cmap=plt.get_cmap('coolwarm_r'), linestyles='-',norm=MidpointNormalize(midpoint=0.), alpha=1, vmin = minz, vmax = maxz )#, alpha=1)#colors='k'# cax = ax1.contourf(X,Y,Z,np.arange(-100, 15, 5), cmap=cm.coolwarm, vmin = minz, vmax = 15 , alpha=1)
+        cbar = fig1.colorbar(cax, ticks=contour_lines)#.set_alpha(1)
+        ticklabs = cbar.ax.get_yticklabels()
+        cbar.ax.set_yticklabels(ticklabs, ha='right', va='center', fontsize=60)
+        cbar.set_label('Free energy (kJ mol$^{-1}$)',fontsize=60, labelpad=40)
+        cbar.ax.yaxis.set_tick_params(pad=200)
+        cbar.set_alpha(1)
+        cbar.draw_all()
     ### Tick parameters
-        ax1.set_xlabel(param['CV1'], fontproperties=font1,  fontsize=80);ax1.set_ylabel(param['CV2'], fontproperties=font1,  fontsize=80)
+        ax1.set_xlabel(param['CV1'], fontproperties=font1,  fontsize=80)
+        ax1.set_ylabel(param['CV2'], fontproperties=font1,  fontsize=80)
         plt.xticks(np.arange(-180, 180.1,param['plot_interval_x']), fontproperties=font1,  fontsize=80)
         plt.yticks(np.arange(-180, 180.1,param['plot_interval_y']), fontproperties=font1,  fontsize=80)#
         ax1.tick_params(axis='both', which='major', width=3, length=5, labelsize=80, direction='out', pad=10)
     ### plot bulk area in dotted lines
-        if param['bulk_outline']:
-            plt.plot(sorted_X_l, sorted_Y_l, color='k', linestyle='--', linewidth=6)
-            plt.plot(sorted_X_s, sorted_Y_s, color='k', linestyle='--', linewidth=6)
-    ### 1D stuff bars
-        if param['1d']:
-            d_landscape, x_landscape, y_landscape, z_landscape =[],[],[],[]
-            for line in range(len(param['start_points'])):
-                distance,d1x,d1y,d1z,point_lower_x,point_lower_y,point_upper_x,point_upper_y=strip_1d(x,y,z, param['start_points'][line], param['end_points'][line], param['search_width'][line])
-                plt.plot([point_lower_x[0],point_lower_x[-1]],[point_lower_y[0],point_lower_y[-1]], color='red',linewidth=10, zorder=2)
-                plt.plot([point_upper_x[0],point_upper_x[-1]],[point_upper_y[0],point_upper_y[-1]], color='red',linewidth=10, zorder=2)
-                plt.plot(d1x,d1y, color='k',linewidth=10, zorder=2)
-                d_landscape.append(distance)
-                x_landscape.append(d1x)
-                y_landscape.append(d1y)
-                z_landscape.append(d1z)
-                # if save_plot != None:
-                write_file(distance,d1x,d1y,d1z, line+1)
-    ### plot limits
-        minx, maxx=min(x)-0.1 ,max(x)+0.1
-        miny, maxy=min(y)-0.1,max(y)+0.1
-        if param['plot_trim'].any():
-            minx, maxx, miny, maxy = param['plot_trim'][0], param['plot_trim'][1], param['plot_trim'][2], param['plot_trim'][3]
-        plt.xlim(minx,maxx);plt.ylim(miny,maxy)
-        plt.subplots_adjust(top=0.972, bottom=0.13,left=0.168,right=0.90, hspace=0.2, wspace=0.2)
-        plt.savefig(param['fes'].replace('.dat','')+'.png', dpi=300)
-        if param['1d']:
-            fig2 = plt.figure(2, figsize=(35,20))### error plot   [0,2.5,5,7.5,10,12.5,15]
-            for val, landscape in enumerate(d_landscape):
-                plt.plot(landscape, z_landscape[val], linewidth=5, label='site '+str(val+1))
-            plt.tick_params(axis='both', which='major', width=3, length=5, labelsize=15, direction='in', pad=10, right=False, top=False)
-            plt.xlabel('Distance (nm)', fontproperties=font2,fontsize=15);plt.ylabel('Energy (kJ mol$^{-1}$)', fontproperties=font2,fontsize=15) 
-            plt.legend(prop={'size': 10}, bbox_to_anchor=(0., 1.02, 1., .102), loc=3, ncol=len(d_landscape), mode="expand", borderaxespad=0.)
-            # plt.savefig(fes+'_1D.png', dpi=300)
-        if param['1d']:
-            plt.savefig(param['fes'].replace('.dat','')+'_1D.png', dpi=300)
-        else:
-            plt.savefig(param['fes'].replace('.dat','')+'.png', dpi=300)
+        if param['bulk_outline']: 
+            plt.plot(bulk[2], bulk[3], color='k', linestyle='--', linewidth=6)
+            plt.plot(bulk[0], bulk[1], color='k', linestyle='--', linewidth=6)
+        plt.subplots_adjust(top=0.972, bottom=0.13,left=0.2,right=0.84, hspace=0.2, wspace=0.2)
+
+        plt.savefig(param['fes'].replace('.dat','')+'_error.png', dpi=300)
         if show:
             plt.show()
-    else:
-#### Error analysis plot
-        x,y,z,e=readfes(param['fes'], param)
-    ###  reshapes x & y to be plotted in 2D 
-        count=0
-        for i in range(len(x)):  ### gets length of X
-            if y[i]== y[0]:
-                count+=1
-            else:
-                break
-        Z = z.reshape(int(len(x)/count),count)
-        E = e.reshape(int(len(x)/count),count)
-        X = np.arange(np.min(x), np.max(x),  (np.sqrt((np.min(x)- np.max(x))**2))/count)# 0.00353453608)#
-        Y = np.arange(np.amin(y), np.amax(y), (np.sqrt((np.min(y)- np.max(y))**2))/(len(x)/count))
-        X, Y = np.meshgrid(X, Y)
-        fig1 = plt.figure(1, figsize=(35,20))### 
-        step = 2.5
-        ax = fig1.add_subplot(111, aspect='equal')
-    ### FES highlights circle or ellipse
-        if param['circle_plot']:
-            for val, ring in enumerate(param['circle_centers']):
-                circle = plt.Circle((ring[0],ring[1]), param['circle_area'][val],linewidth=10,edgecolor='k',facecolor='none', zorder=2)
-                ax1.add_artist(circle)
-        if param['ellipse_plot']:
-            for val, ring in enumerate(param['ellipse_centers']):
-                ellipse = patches.Ellipse(xy=(ring[0],ring[1]), width=param['ellipse_width'][val], height=param['ellipse_height'][val], angle=param['ellipse_angle'][val],linewidth=10,edgecolor='k',facecolor='none', zorder=2) # original
-                ax1.add_artist(ellipse)
-        cax = ax.contourf(X,Y,E, np.arange(0,np.nanmax(e)+step,step),cmap=plt.get_cmap('coolwarm'),norm=MidpointNormalize(midpoint=0.), alpha=0.25, vmin = np.nanmin(e), vmax = np.nanmax(e))# , alpha=0.25)
-        cone = ax.contour(X,Y,E, np.arange(0,np.nanmax(e)+step,step),linewidths=8, cmap=plt.get_cmap('coolwarm'), linestyles='-',norm=MidpointNormalize(midpoint=0.), alpha=1, vmin = np.nanmin(e), vmax = np.nanmax(e) )#, alpha=1)#colors='k'# cax = ax1.contourf(X,Y,Z,np.arange(-100, 15, 5), cmap=cm.coolwarm, vmin = minz, vmax = 15 , alpha=1)
-        # conz = ax.contour(X,Y,Z,[5], linewidths=8, cmap=plt.get_cmap('coolwarm_r'), linestyles='-',norm=MidpointNormalize(midpoint=0.), alpha=1, vmin = minz, vmax = maxz )#, alpha=1)#colors='k'# cax = ax1.contourf(X,Y,Z,np.arange(-100, 15, 5), cmap=cm.coolwarm, vmin = minz, vmax = 15 , alpha=1)
 
-    #### colourbar   np.arange(np.round(minz,-1), maxz+1, step*2))
-        cbar = fig1.colorbar(cax, ticks=np.arange(0,np.nanmax(e)+step,step))#np.append(np.arange(np.round(minz,0), -2.5, step*2),5))#.set_alpha(1)
-        ticklabs = cbar.ax.get_yticklabels()
-        cbar.ax.set_yticklabels(ticklabs, ha='right', va='center', fontsize=60)
-        cbar.set_label('Free energy (kJ mol$^{-1}$)',fontsize=60, labelpad=40)
-        cbar.ax.yaxis.set_tick_params(pad=200)
-        cbar.set_alpha(1)
-        cbar.draw_all()
-        # print(np.nanmin(E), np.nanmax(E))
-
-        plt.xlim(min(x)-0.1,max(x)+0.1);plt.ylim(min(y)-0.1,max(y)+0.1)
-        plt.subplots_adjust(top=0.972, bottom=0.13,left=0.168,right=0.90, hspace=0.2, wspace=0.2)
-        
-        # plt.savefig(param['fes'].replace('.dat','')+'_error.png', dpi=300)
-        if show:
-            plt.show()
-    #####
-        # plt.figure(3, figsize=(20,10))  
-
-        # for val,energy in enumerate(landscape):
-        #   energy = set_to_zero(energy)
-        #   en_val_prev=20
-        #   up=0
-        #   for index, en_val in enumerate(energy):
-        #       if en_val <= en_val_prev:
-        #           en_val_prev=en_val
-        #           up=0
-        #       if up==10:
-        #           zmin=np.sqrt(((x_landscape[val][index]-x_landscape[val][0])**2)+((y_landscape[val][index]-y_landscape[val][0])**2))
-        #           break
-        #       else:
-        #           up+=1
-        #   index =np.where(np.min(energy)==energy)
-        #   zmin=np.sqrt(((x_landscape[val][index]-x_landscape[val][0])**2)+((y_landscape[val][index]-y_landscape[val][0])**2))
-        #   distance=np.sort(np.sqrt(((x_landscape[val]-x_landscape[val][0])**2)+((y_landscape[val]-y_landscape[val][0])**2)))-np.mean(zmin)
-        #   write_file(distance,energy, val+1)
-        #   plt.plot(distance, energy,linewidth=4, label='Site: '+str(val+1))
-        #   print(val+1, np.min(energy))
 
 
 def strip(param, fes):
     if os.path.exists(param['prefix']+str(fes)+'.dat'):
         x,y,z, e=readfes(param['prefix']+str(fes)+'.dat', param)
         start_time = time.time()
-        bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = bulk_val(x,y,z, param)
+        z, bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = get_bulk(x,y,z, param)
         output=[fes,bulk]
         if param['circle_plot']:
             if len(param['circle_centers']) > 0:
@@ -721,7 +759,7 @@ def bootstrap(z):
 def average_fes(param, fes, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l):
     print('reading in '+param['prefix']+str(fes)+'.dat')
     start_time = time.time()
-    x,y,z, e=readfes(param['prefix']+str(fes)+'.dat', param)
+    x,y,z, e = readfes(param['prefix']+str(fes)+'.dat', param)
     shuffledxy = np.stack((x,y), axis=-1)
     bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = find_bulk(x,y,z,shuffledxy,sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l)
     z[ z==0 ] = np.nan
