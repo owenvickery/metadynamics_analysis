@@ -289,7 +289,7 @@ def bulk_val(x,y,z, param):
     sorted_x, sorted_y = separate_contours(sorted_coord)
 
 #### gives line around outside
-    xy=np.stack((ave(sorted_x, 50)[::10],ave(sorted_y, 50)[::10]), axis=-1)
+    xy=np.stack((sorted_x,sorted_y), axis=-1)
     sorted_X_l,sorted_Y_l,sorted_X_s, sorted_Y_s  = np.array([]),np.array([]),np.array([]),np.array([])
     for coord in xy:
         coords = shrink_bulk_outline(coord, param['bulk_outline_shrink'])
@@ -314,9 +314,11 @@ def separate_contours(sorted_coord):
             if np.sqrt(((sorted_coord[i][0]-sorted_x[-1])**2)+((sorted_coord[i][1]-sorted_y[-1])**2)) < 0.5 and run:
                 sorted_x.append(sorted_coord[i][0])
                 sorted_y.append(sorted_coord[i][1])
-    sorted_x.append(sorted_x[0])
-    sorted_y.append(sorted_y[0])
-    return sorted_x, sorted_y
+    sorted_x = ave(sorted_x, 50)[::10]
+    sorted_y = ave(sorted_y, 50)[::10]
+    # sorted_x = np.append(sorted_x[0])
+    # sorted_y.append(sorted_y[0])
+    return np.append(sorted_x, sorted_x[0]), np.append(sorted_y, sorted_y[0])
 
 def shrink_bulk_outline(coord, shrink):
     s=1
