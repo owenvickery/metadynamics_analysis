@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import functions
 import argparse
 import os, sys
@@ -206,3 +208,4 @@ if __name__ == '__main__':
         setting = ['cv_min', 'cv_max', 'step_xaxis', 'step_yaxis']+one_dimension
         param = functions.parameters(args.input, setting, param)
         functions.timecourse(param, args.show)
+

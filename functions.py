@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os, sys
 import numpy as np
 import scipy.constants
@@ -316,8 +318,6 @@ def separate_contours(sorted_coord):
                 sorted_y.append(sorted_coord[i][1])
     sorted_x = ave(sorted_x, 50)[::10]
     sorted_y = ave(sorted_y, 50)[::10]
-    # sorted_x = np.append(sorted_x[0])
-    # sorted_y.append(sorted_y[0])
     return np.append(sorted_x, sorted_x[0]), np.append(sorted_y, sorted_y[0])
 
 def shrink_bulk_outline(coord, shrink):
