@@ -251,6 +251,7 @@ def clockwiseangle_and_distance(point):
 def get_contour_verts(cn):
     contours = []
     # for each contour line
+    print(cn.levels)
     for cc in cn.collections:
         paths = []
         # for each separate section of the contour line
@@ -262,38 +263,32 @@ def get_contour_verts(cn):
             paths.append(np.vstack(xy))
         contours.append(paths)
 
-    return contours
+    return cn.levels, contours
 
-def cont_strip(contour_set):
-    x, y=np.array([]), np.array([])
-    for i in contour_set:
-        x = np.append(x, i[:,0])
-        y = np.append(y, i[:,1])
-    return x, y
+def area(vs):
+    a = 0
+    x0,y0 = vs[0]
+    for [x1,y1] in vs[1:]:
+        dx = x1-x0
+        dy = y1-y0
+        a += 0.5*(y0*dx - x0*dy)
+        x0 = x1
+        y0 = y1
+    return a
 
 def bulk_val(x,y,z, param): 
     X,Y,Z,E = reshape_fes(x,y,z,z, param)
-    cn = plt.contour(X, Y, Z, np.arange(5,np.nanmax(Z), 2), alpha=0.5)#np.array([0,5]))
-    # cbar = plt.colorbar(cn)#.set_alpha(1)
-    cont = get_contour_verts(cn)
+    cn = plt.contour(X, Y, Z, np.arange(np.nanmax(Z)-10,np.nanmax(Z), 5), alpha=0.5)#np.array([0,5]))
+    contour_coll = cn.collections[0]
+    cont = contour_coll.get_paths()[0].vertices
+    print('Area of landscape is: ', np.round(area(cont),2))
     plt.close()
-    # plt.clear()
-    x_all, y_all = [],[]
-    for i_val, i in enumerate(cont):
-        x, y = cont_strip(i)
-        if len(x) > 0:
-            x_all = np.append(x_all,x)
-            y_all = np.append(y_all,y)
-
-    shuffledxy = np.stack((x_all,y_all), axis=-1)
-
-    sorted_coord=sorted(np.array(shuffledxy), key=clockwiseangle_and_distance)
-    sorted_x, sorted_y = separate_contours(sorted_coord)
+    stride = int(len(np.array(cont))/200)
+    shuffledxy = np.array(cont)[::stride]
 
 #### gives line around outside
-    xy=np.stack((sorted_x,sorted_y), axis=-1)
     sorted_X_l,sorted_Y_l,sorted_X_s, sorted_Y_s  = np.array([]),np.array([]),np.array([]),np.array([])
-    for coord in xy:
+    for coord in shuffledxy:
         coords = shrink_bulk_outline(coord, param['bulk_outline_shrink'])
         low_coords = shrink_bulk_outline(coords, param['bulk_area'])
         sorted_X_l = np.append(sorted_X_l, coords[0])
@@ -305,20 +300,6 @@ def bulk_val(x,y,z, param):
             bulk_values.write(str(sorted_X_s[i])+'\t'+str(sorted_Y_s[i])+'\t'+str(sorted_X_l[i])+'\t'+str(sorted_Y_l[i])+'\n')
     bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = find_bulk(x,y,z,np.stack((x,y), axis=-1),sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l)
     return bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l
-
-def separate_contours(sorted_coord):
-    run=False
-    for i in range(1, len(sorted_coord)): 
-        if np.sqrt(((sorted_coord[i-1][0]-0)**2)+((sorted_coord[i-1][1]-0)**2)) > 2 and not run:
-            run=True
-            sorted_x, sorted_y = [sorted_coord[i-1][0]], [sorted_coord[i-1][1]]
-        if run:
-            if np.sqrt(((sorted_coord[i][0]-sorted_x[-1])**2)+((sorted_coord[i][1]-sorted_y[-1])**2)) < 0.5 and run:
-                sorted_x.append(sorted_coord[i][0])
-                sorted_y.append(sorted_coord[i][1])
-    sorted_x = ave(sorted_x, 50)[::10]
-    sorted_y = ave(sorted_y, 50)[::10]
-    return np.append(sorted_x, sorted_x[0]), np.append(sorted_y, sorted_y[0])
 
 def shrink_bulk_outline(coord, shrink):
     s=1
@@ -465,7 +446,7 @@ def find_min(floatz):
     return minz
 
 def write_pdb(pdb_file, z, xy_coord):
-    pdbline = "ATOM  %5d %4s %4s%1s%4d    %8.3f%8.3f%8.3f%6.2f%6.2f"
+    pdbline = "ATOM  %5d %4s %4s%1s%4d    %8.3f%8.3f%8.3f%6.0f%6.0f"
     box_line="CRYST1 %8.3f %8.3f %8.3f  90.00  90.00  90.00 P 1           1\n"
     with open(pdb_file, 'w') as pdb:
         at_count=0
@@ -474,20 +455,24 @@ def write_pdb(pdb_file, z, xy_coord):
                 at_count+=1
                 pdb.write(pdbline%((at_count, 'dg', 'head',' ',1,float(x), float(y), z, xy_coord[x][y]['error'], xy_coord[x][y]['energy']))+'\n')
 
+def myround(x, base):
+    return base * round(x/base)
+
 def simple_fes(fes, param):
     energy = {}
     for position in fes:
         if position[2] < 5:
             x = (position[0]+param['pdb_offset'][0])*10
             y = (position[1]+param['pdb_offset'][1])*10
-            x = np.round(x * 2) / 2
-            y = np.round(y * 2) / 2
+            x = myround(x, param['pdb_res'])
+            y = myround(y, param['pdb_res'])
             if str(x) not in energy:
                 energy[str(x)]={}
             if str(y) not in energy[str(x)]:
                 energy[str(x)][str(y)] = {'energy':[], 'error':[]}
             energy[str(x)][str(y)]['energy'].append(position[2])
             energy[str(x)][str(y)]['error'].append(position[3])
+
     return energy
 
 def trim_fes(x_list,y_list, z_list, e_list, param):
@@ -505,17 +490,16 @@ def average_simple_fes(sim_fes):
                 dict_mean[x] = {}
             if len(sim_fes[x][y]['energy']) > 0:
                 dict_mean[x][y] = {}
-                dict_mean[x][y]['energy'] = np.mean(sim_fes[x][y]['energy']) 
+                dict_mean[x][y]['energy'] = int(np.mean(sim_fes[x][y]['energy'])) 
                 if len(sim_fes[x][y]['error']) > 0:
-                    dict_mean[x][y]['error'] = np.mean(sim_fes[x][y]['error'])
+                    dict_mean[x][y]['error'] = int(np.mean(sim_fes[x][y]['error']))
                 else:
                     dict_mean[x][y]['error'] = 0
     return dict_mean
 
 def plot_pdb(param):
-    print('reading in :'+param['fes'])
+    print('reading in : '+param['fes'])
     x_list,y_list,z_list,e_list=readfes(param['fes'], param)    ### reads in energy landscape
-    print('finding bulk')
     z_list, bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = get_bulk(x_list,y_list,z_list, param)
     if any(param['plot_trim']):
         fes = trim_fes(x_list,y_list, z_list, e_list, param)
@@ -566,6 +550,7 @@ def reshape_fes(x,y,z,e, param):
 def get_bulk(x,y,z, param):
 #### fetch bulk area    
     if os.path.exists(param['bulk_values']):  ### reads bulk value file to get bulk area
+        print('reading in bulk area from: ', param['bulk_values'])
         coord=np.genfromtxt(param['bulk_values'], autostrip=True)
         sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l=coord[:,0],coord[:,1],coord[:,2],coord[:,3]
         shuffledxy = np.stack((x,y), axis=-1)
@@ -573,8 +558,9 @@ def get_bulk(x,y,z, param):
     else:   ### finds bulk area from scratch (much slower)
         print('finding bulk area')
         bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l = bulk_val(x,y,z, param)
+        print('finshed finding bulk')
 
-    z[ z==0 ] = np.ma.masked    ### removes unsampled area by converting to nan
+    # z[ z==0 ] = np.ma.masked    ### removes unsampled area by converting to nan
     z=np.clip(z-bulk,np.nanmin(z)-bulk,param['plot_energy_max'])    
     z[ z>=param['plot_energy_max'] ] = np.ma.masked
     return z, bulk, sorted_X_s, sorted_Y_s, sorted_X_l, sorted_Y_l
@@ -592,7 +578,7 @@ def final_frame(param, error, show):
     plt.close()
     # plt.clear()    
     fig1 = plt.figure(1, figsize=(30,20))
-    ax1 = fig1.add_subplot(111, aspect='equal')
+    ax1 = fig1.add_subplot(111)#, aspect='equal')
 ### add picture
     if param['picture']:   ### background picture
         im1 = plt.imread(param['picture_file'])

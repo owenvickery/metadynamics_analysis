@@ -29,7 +29,7 @@ if __name__ == '__main__':
     param_input_names={'prefix':'fes_', 'fes':'fes.dat', '1d_location':'1d_landscapes', 'bulk_values':'bulk_values', 
                       'HILLS_skip':'HILLS_skipped', 'HILLS_sort':'HILLS_sorted','HILLS':'HILLS'}   
 
-    param_pdb = {'pdb_output':'fes_pdb.pdb', 'pdb_offset':np.array([0,0,0])}   
+    param_pdb = {'pdb_output':'fes_pdb.pdb', 'pdb_offset':np.array([0,0,0]), 'pdb_res':0.5}   
 
     param_converge = {'converge_x_interval':False, 'converge_y_interval':False, 'converge_labels':35, 'converge_title_height':0.8}
 
@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     if args.f == 'pdb':
         setting = ['bulk_values', 'fes', 'bulk_outline', 'plot_trim','trim', 'bulk_outline_shrink', 'bulk_area', 
-                   'plot_energy_max','pdb_offset', 'pdb_output', 'invert_x', 'invert_y'] 
+                   'plot_energy_max','pdb_offset', 'pdb_output', 'invert_x', 'invert_y', 'pdb_res'] 
         param = functions.parameters(args.input, setting, param)
         functions.check_variable(setting, param)
         functions.plot_pdb(param)
