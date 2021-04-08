@@ -33,7 +33,9 @@ if __name__ == '__main__':
 
     param_converge = {'converge_x_interval':False, 'converge_y_interval':False, 'converge_labels':35, 'converge_title_height':0.8}
 
-    param = {**param_switches, **param_initial_values, **param_input_names, **param_pdb, **param_plot_default, **param_converge}
+    param_cv_plot = {'cv_tick_size':25,'cv_labels_size':25,'cv_x_interval':2,'cv_y_interval':2, 'cv_title_height': 1, 'cv_hist_density_x':10,'cv_hist_density_y':10}
+
+    param = {**param_switches, **param_initial_values, **param_input_names, **param_pdb, **param_plot_default, **param_converge, **param_cv_plot}
 
     circle = ['circle_area','circle_centers']
 
@@ -196,12 +198,16 @@ if __name__ == '__main__':
 
     if args.f == 'cv_plot':
         setting = ['walker_range','cv_title_height','cv_tick_size', 'cv_labels_size', 'circle_plot', 
-                    'ellipse_plot', 'CV1', 'CV2', 'cv_x_interval', 'cv_y_interval', 'invert_x', 'invert_y']
-        param = functions.parameters(args.input, setting, param)
+                    'ellipse_plot', 'CV1', 'CV2', 'cv_x_interval', 'cv_y_interval', 'invert_x', 'invert_y',
+                    'cv_hist_density_x','cv_hist_density_y']
+        
         if param['circle_plot']:
-            param = functions.parameters(args.input, circle, param)
+            setting += circle
         if param['ellipse_plot']:
-            param = functions.parameters(args.input, ellipse, param)
+            setting += ellipse
+        param = functions.parameters(args.input, setting, param)
+        functions.check_variable(setting, param)
+
         functions.plot_CV(param, args.show)
 
     if args.f == 'timecourse':

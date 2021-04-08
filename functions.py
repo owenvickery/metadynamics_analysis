@@ -23,7 +23,7 @@ import re
 from scipy import stats
 from numba import jit
 from scipy.spatial import cKDTree
-from scipy.interpolate import UnivariateSpline
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Fonts
 
@@ -951,22 +951,63 @@ def bootstrap_1d(param, show):
 
 
 def plot_CV(param, show):
+    print('Fetching CV from HILLS files in range: ', param['walker_range'])
     plt.close()
     plt.rcParams['mathtext.default'] = 'regular'
     plt.rcParams['axes.linewidth'] = 3
-    hills_files=[]
-    for walker in range(int(param['walker_range'][0]),int(param['walker_range'][1])+1):
-        if os.path.exists('HILLS.'+str(walker)):
-            hills_files.append('HILLS.'+str(walker))    
-    hills_x, hills_y=hills_files.copy(), hills_files.copy()
-    time, dx, dy, gau=[],[],[],[]
-    count=0
-    check=False
-    fig1 = plt.figure(1, figsize=(17.9,20))
-
+    hills_files = get_hills_file_names(param)
     pool = mp.Pool(mp.cpu_count())
-    xy = pool.starmap(multi_read_hills, [(hill_val, hills_file)  for hill_val, hills_file in enumerate(hills_files)])
-    pool.close
+    xy = pool.starmap(multi_read_hills, [(hill_val, hills_file, param)  for hill_val, hills_file in enumerate(hills_files)])
+    pool.close()
+    x_min, x_max, y_min, y_max = fetch_min_max(xy)
+    total_x,total_y = put_cv_grid(xy)
+
+    fig1 = plt.figure(1, figsize=(16,4*math.ceil((len(xy)+2)/4)))
+    for hill_val in range(len(xy)+1):
+        ax1 = fig1.add_subplot(math.ceil((len(xy)+2)/4),4, hill_val+1, aspect='equal')
+        if hill_val == 0:
+            plt.title('Total CV density',  fontproperties=font1, fontsize=param['cv_labels_size'],y=param['cv_title_height'])
+            plt.hist2d(total_x,total_y, bins=[int(np.max(total_x)-np.min(total_x))*param['cv_hist_density_x'],int(np.max(total_y)-np.min(total_y))*param['cv_hist_density_y']], cmap=plt.get_cmap('coolwarm_r'), density=True, cmin=0.01)
+            plt.colorbar(fraction=0.034)
+        else:
+            plt.title(str(hill_val) ,  fontproperties=font1, fontsize=param['cv_labels_size'],y=param['cv_title_height'])
+            ran=np.linspace(0,1,len(xy[hill_val-1][hill_val-1:,0]))
+            ax1.scatter(xy[hill_val-1][hill_val-1:,0], xy[hill_val-1][hill_val-1:,1],s=1,c = cm.coolwarm(ran))
+
+        if param['circle_plot']: 
+            for val, ring in enumerate(param['circle_centers']):
+                circle = plt.Circle((ring[0],ring[1]), param['circle_area'][val],linewidth=2,edgecolor='k',facecolor='none', zorder=2)
+                ax1.add_artist(circle)
+        if param['ellipse_plot']:
+            for val, ring in enumerate(param['ellipse_centers']):
+                ellipse = patches.Ellipse(xy=(ring[0],ring[1]), width=param['ellipse_width'], height=param['ellipse_height'], angle=param['ellipse_angle'],linewidth=10,edgecolor='k',facecolor='none', zorder=2) 
+                ax1.add_artist(ellipse)
+
+        plt.yticks(np.arange(-10, 10,param['cv_x_interval']), fontproperties=font1)#
+        plt.xticks(np.arange(-10, 10,param['cv_y_interval']), fontproperties=font1)#
+        lef, bot=False,False    
+        if hill_val+1 in np.arange(1, len(hills_files)+5,4):
+            plt.ylabel(param['CV2'], fontproperties=font2,fontsize=param['cv_labels_size']) 
+            lef=True
+        if hill_val+1 in np.arange(len(hills_files)+1, len(hills_files)-3,-1):
+            plt.xlabel(param['CV1'], fontproperties=font2,fontsize=param['cv_labels_size'])
+            bot=True  
+        plt.xlim(x_min, x_max)
+        plt.ylim(y_min, y_max)
+        ax1.tick_params(axis='both', which='major', width=3, length=5, labelsize=param['cv_tick_size'], direction='in', pad=10 , labelbottom=bot, labelleft=lef,right=True, top=True, left=True, bottom=True)
+        plt.subplots_adjust(left=0.1, wspace=0.18, hspace=-0.5, top=0.975, bottom=0.08)
+    plt.savefig('hills_CV_trace.png', dpi=300)
+    if show:
+        plt.show()
+
+def put_cv_grid(xy):
+    x, y =np.array([]),np.array([])
+    for hill_val, hills_file in enumerate(xy):
+        x = np.append(x, xy[hill_val][hill_val:,0])
+        y = np.append(y, xy[hill_val][hill_val:,1])
+    return x, y
+
+def fetch_min_max(xy):
     x_min, x_max, y_min,y_max =0, 0, 0, 0
     for hills in xy:
         hills=np.array(hills)
@@ -979,49 +1020,37 @@ def plot_CV(param, show):
         if y_max < np.max(hills[:,1]): 
             y_max = np.max(hills[:,1]) 
 
-    x_min, x_max, y_min, y_max = x_min*1.1, x_max*1.1, y_min*1.1,y_max*1.1
-    for hill_val, hills_file in enumerate(xy):
-        ax1 = fig1.add_subplot(5,4, hill_val+1, aspect='equal')
-        plt.title(str(hill_val+1) ,  fontproperties=font1, fontsize=30,y=param['cv_title_height'])
-        ran=np.linspace(0,1,len(xy[hill_val][hill_val:,0]))
-        ax1.scatter(xy[hill_val][hill_val:,0], xy[hill_val][hill_val:,1],s=1,c = cm.coolwarm(ran))
-        if param['circle_plot']: 
-            for val, ring in enumerate(param['circle_centers']):
-                circle = plt.Circle((ring[0],ring[1]), param['circle_area'][val],linewidth=2,edgecolor='k',facecolor='none', zorder=2)
-                ax1.add_artist(circle)
-        if param['ellipse_plot']:
-            for val, ring in enumerate(param['ellipse_centers']):
-                ellipse = patches.Ellipse(xy=(ring[0],ring[1]), width=param['ellipse_width'], height=param['ellipse_height'], angle=param['ellipse_angle'],linewidth=10,edgecolor='k',facecolor='none', zorder=2) 
-                ax1.add_artist(ellipse)
-        plt.yticks(np.arange(-10, 10,param['cv_x_interval']), fontproperties=font1)#
-        plt.xticks(np.arange(-10, 10,param['cv_y_interval']), fontproperties=font1)#
-        rows=[1,5,9,13,17]
-        lef, bot=False,False    
-        if hill_val+1 in rows:
-            plt.ylabel(param['CV2'], fontproperties=font2,fontsize=param['cv_labels_size']) 
-            lef=True
-        if hill_val+1 in np.arange(len(hills_files), len(hills_files)-4,-1):
-            plt.xlabel(param['CV1'], fontproperties=font2,fontsize=param['cv_labels_size'])
-            bot=True  
-        plt.xlim(x_min, x_max)
-        plt.ylim(y_min, y_max)
-        ax1.tick_params(axis='both', which='major', width=3, length=5, labelsize=param['cv_tick_size'], direction='in', pad=10 , labelbottom=bot, labelleft=lef,right=True, top=True, left=True, bottom=True)
-        plt.subplots_adjust(left=0.1, wspace=0.1, hspace=0.1, top=0.975, bottom=0.08)
-    plt.savefig('hills_CV_trace.png', dpi=300)
-    if show:
-        plt.show()
+    return x_min*1.1, x_max*1.1, y_min*1.1,y_max*1.1
 
-def multi_read_hills(hill_val, hills_file):
+def get_hills_file_names(param):
+    hills_files=[]
+    if len(param['walker_range']) == 2:
+        for walker in range(int(param['walker_range'][0]),int(param['walker_range'][1])+1):
+            if os.path.exists('HILLS.'+str(walker)):
+                hills_files.append('HILLS.'+str(walker))    
+    elif len(param['walker_range']) == 1:
+        if os.path.exists('HILLS.'+str(int(param['walker_range'][0]))):
+            hills_files.append('HILLS.'+str(int(param['walker_range'][0])))
+    else:
+        sys.exit('There is a issue with the input parameter: walker_range')
+    return hills_files
+
+def multi_read_hills(hill_val, hills_file, param):
+    print('reading in ',hills_file)
     hills=[]
     with open(hills_file, 'r') as hills_file_in:
         for line in hills_file_in:
             if not line[0] in ['#', '@']:
                 if np.round(np.round(float(line.split()[0]), 3),3).is_integer():
-                    hills.append([float(line.split()[1]), float(line.split()[2])])
+                    hills.append([float(line.split()[1])*param['invert_x'], float(line.split()[2])*param['invert_y']]) 
+
     hills = np.array(hills)
-    if len(hills[:,0]) != len(hills[:,1]):
+    if len(hills)==0:
         sys.exit('error with HILLS file: '+hill_val)
-    return hills
+    elif len(hills[:,0]) != len(hills[:,1]):
+        sys.exit('error with HILLS file: '+hill_val)
+    else:
+        return hills
 
 
 def timecourse(param, show):
